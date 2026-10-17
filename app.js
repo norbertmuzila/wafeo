@@ -2,118 +2,199 @@
 //  WAFEO Platform — Frontend Application
 // ════════════════════════════════════════
 
-// Dynamic API URL: relative on Vercel, full URL on GitHub Pages
-const API = window.location.hostname.includes('vercel.app') || window.location.hostname === 'localhost'
+// Dynamic API URL: relative when served by our own backend, full URL on GitHub Pages
+const API = /vercel\.app$|^localhost$|^127\.0\.0\.1$/.test(window.location.hostname)
   ? '/api'
-  : 'https://wafeo.vercel.app/api';
+  : 'https://wafeo-webapplication.vercel.app/api';
+const GOOGLE_CLIENT_ID = '681642080635-fpqmjobr8hnt63adria7qmlk3kar8kej.apps.googleusercontent.com';
+const SESSION_KEY = 'wafeo.session';
+const ROLE_LABELS = {
+  admin: 'Administrator', farmer: 'Farmer / Extension', policy: 'Gov / Policy',
+  government: 'Gov / Policy', researcher: 'Researcher'
+};
+
 let authToken = null;
 let currentUser = null;
 
-// (Login particles and globe canvas removed for clean EMHARE theme)
+// ─── SESSION STORAGE ───
+// "Remember me" keeps the session in localStorage (survives closing the
+// browser); otherwise sessionStorage (cleared when the tab closes).
+function saveSession(remember) {
+  const value = JSON.stringify({ token: authToken, user: currentUser, remember: !!remember });
+  try {
+    (remember ? localStorage : sessionStorage).setItem(SESSION_KEY, value);
+    (remember ? sessionStorage : localStorage).removeItem(SESSION_KEY);
+  } catch (e) { /* storage blocked: session lasts until reload */ }
+}
+
+function readSavedSession() {
+  try {
+    const raw = localStorage.getItem(SESSION_KEY) || sessionStorage.getItem(SESSION_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch (e) { return null; }
+}
+
+function clearSession() {
+  try { localStorage.removeItem(SESSION_KEY); sessionStorage.removeItem(SESSION_KEY); } catch (e) {}
+}
+
+function authHeaders(extra = {}) {
+  return authToken ? { ...extra, 'Authorization': 'Bearer ' + authToken } : { ...extra };
+}
+
+function escapeHtml(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+async function postJson(path, body, timeoutMs = 20000) {
+  const res = await fetch(API + path, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(timeoutMs)
+  });
+  const data = await res.json().catch(() => ({}));
+  return { res, data };
+}
+
+function showLoginError(message) {
+  const errEl = document.getElementById('loginError');
+  if (!errEl) return;
+  errEl.textContent = message || '';
+  errEl.classList.toggle('show', !!message);
+}
+
+function networkErrorMessage(err) {
+  return err && err.name === 'TimeoutError'
+    ? 'The server took too long to respond. Please try again.'
+    : 'Cannot reach the WAFEO server. Check your internet connection and try again.';
+}
+
+function logActivity(action, details) {
+  if (!authToken) return;
+  fetch(API + '/activity/log', {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ action, details })
+  }).catch(() => {});
+}
+
+// ─── ENTER / LEAVE THE APP ───
+// One path for password login, Google sign-in, sign-up and session restore.
+function enterApp(session, { remember = true, action = null } = {}) {
+  authToken = session.token;
+  currentUser = session.user;
+  saveSession(remember);
+  showLoginError('');
+
+  const name = currentUser.name || currentUser.username || 'User';
+  document.getElementById('sbName').textContent = name;
+  document.getElementById('sbRole').textContent = ROLE_LABELS[currentUser.role] || 'Member';
+  const avatar = document.getElementById('sbAvatar');
+  const initials = name.split(/\s+/).map(n => n[0]).join('').substring(0, 2).toUpperCase();
+  if (currentUser.picture) {
+    avatar.innerHTML = `<img src="${escapeHtml(currentUser.picture)}" alt="" referrerpolicy="no-referrer" style="width:100%;height:100%;border-radius:50%;object-fit:cover" onerror="this.parentNode.textContent='${initials}'">`;
+  } else {
+    avatar.textContent = initials;
+  }
+
+  const adminPanel = document.getElementById('adminUsersPanel');
+  if (adminPanel && currentUser.role !== 'admin') adminPanel.style.display = 'none';
+
+  document.getElementById('loginScreen').classList.add('out');
+  setTimeout(() => { document.getElementById('appShell').classList.add('on'); }, 400);
+  // A broken panel must never block sign-in.
+  Promise.resolve().then(loadDashboard).catch(err => console.error('Dashboard load failed:', err));
+  try { initMapOnce(); } catch (err) { console.error('Map init failed:', err); }
+  if (action) logActivity(action, `Signed in (${currentUser.email || currentUser.username})`);
+}
+
+function doLogout() {
+  logActivity('logout', 'User logged out');
+  clearSession();
+  try { if (window.google && google.accounts && google.accounts.id) google.accounts.id.disableAutoSelect(); } catch (e) {}
+  // A reload gives the next user a clean slate (map, charts, caches).
+  setTimeout(() => window.location.reload(), 150);
+}
+
+function handleExpiredSession() {
+  if (!authToken) return;
+  authToken = null;
+  clearSession();
+  try { sessionStorage.setItem('wafeo.expired', '1'); } catch (e) {}
+  window.location.reload();
+}
+
+// Restore a saved session on page load.
+(async function restoreSession() {
+  try {
+    if (sessionStorage.getItem('wafeo.expired')) {
+      sessionStorage.removeItem('wafeo.expired');
+      showLoginError('Your session expired. Please sign in again.');
+    }
+  } catch (e) {}
+  const saved = readSavedSession();
+  if (!saved || !saved.token) return;
+  try {
+    const res = await fetch(API + '/auth/me', {
+      headers: { 'Authorization': 'Bearer ' + saved.token },
+      signal: AbortSignal.timeout(15000)
+    });
+    if (res.ok) {
+      enterApp(await res.json(), { remember: saved.remember });
+    } else if (res.status === 401) {
+      clearSession();
+    }
+  } catch (e) {
+    // Offline or server cold-starting: keep the saved session, show login.
+    console.warn('Session restore failed:', e);
+  }
+})();
 
 // ─── AUTH ───
 document.getElementById('btnLogin').addEventListener('click', doLogin);
-document.getElementById('inPass').addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
+document.getElementById('inPass').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+document.getElementById('inUser').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('inPass').focus(); });
 
 // ─── Google Sign-In ───
-function handleGoogleCredentialResponse(response) {
-  const errEl = document.getElementById('loginError');
-  errEl.classList.remove('show');
-
-  (async () => {
-    try {
-      // Send the credential to the backend for verification and user creation
-      const googleAbort = new AbortController();
-      setTimeout(() => googleAbort.abort(), 8000);
-      const res = await fetch(API + '/auth/google', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ credential: response.credential }),
-        signal: googleAbort.signal
-      });
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || 'Google authentication failed');
-      }
-
-      // Successful Google login
-      authToken = data.token;
-      currentUser = data.user;
-
-      document.getElementById('sbName').textContent = currentUser.name || currentUser.username;
-      document.getElementById('sbRole').textContent = currentUser.role === 'admin' ? 'Administrator' : 'Researcher';
-      document.getElementById('sbAvatar').textContent = (currentUser.name || 'U').split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
-
-      document.getElementById('loginScreen').classList.add('out');
-      setTimeout(() => { document.getElementById('appShell').classList.add('on'); }, 400);
-      loadDashboard();
-      initMapOnce();
-
-      // Log activity
-      try {
-        fetch(API + '/activity/log', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
-          body: JSON.stringify({ action: 'google_login', details: 'User logged in via Google (' + (currentUser.email || '') + ')' })
-        });
-      } catch(e) {}
-
-    } catch (err) {
-      console.error('Google Sign-In failed:', err);
-      // Fallback: decode JWT locally if backend is unreachable
-      try {
-        const base64Url = response.credential.split('.')[1];
-        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-        const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
-            return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-        }).join(''));
-        const payload = JSON.parse(jsonPayload);
-
-        authToken = 'google-local-token';
-        currentUser = { name: payload.name, email: payload.email, role: 'researcher', picture: payload.picture };
-
-        document.getElementById('sbName').textContent = currentUser.name;
-        document.getElementById('sbRole').textContent = 'Researcher';
-        document.getElementById('sbAvatar').textContent = currentUser.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
-
-        document.getElementById('loginScreen').classList.add('out');
-        setTimeout(() => { document.getElementById('appShell').classList.add('on'); }, 400);
-        loadDashboard();
-        initMapOnce();
-      } catch (fallbackErr) {
-        errEl.textContent = 'Google sign-in failed. Please try again.';
-        errEl.classList.add('show');
-      }
-    }
-  })();
+// Any Google account can sign in; the backend verifies the ID token and
+// creates the WAFEO account on first use.
+async function handleGoogleCredentialResponse(response) {
+  showLoginError('');
+  try {
+    const { res, data } = await postJson('/auth/google', { credential: response.credential });
+    if (!res.ok) return showLoginError(data.error || 'Google sign-in failed. Please try again.');
+    const remember = document.getElementById('rememberMe');
+    enterApp(data, { remember: remember ? remember.checked : true, action: 'google_login' });
+  } catch (err) {
+    console.error('Google Sign-In failed:', err);
+    showLoginError(networkErrorMessage(err));
+  }
 }
 
 function initGoogleSignIn() {
-  const googleClientId = '681642080635-fpqmjobr8hnt63adria7qmlk3kar8kej.apps.googleusercontent.com';
-  
+  const container = document.getElementById('googleButtonContainer');
+  if (!container) return;
   google.accounts.id.initialize({
-    client_id: googleClientId,
+    client_id: GOOGLE_CLIENT_ID,
     callback: handleGoogleCredentialResponse,
     auto_select: false,
-    cancel_on_tap_outside: true
+    cancel_on_tap_outside: true,
+    ux_mode: 'popup'
   });
-
-  google.accounts.id.renderButton(
-    document.getElementById("googleButtonContainer"),
-    { theme: "outline", size: "large", width: 330, text: "signin_with" }
-  );
+  const width = Math.min(330, Math.max(200, (container.parentElement && container.parentElement.clientWidth) || 330));
+  google.accounts.id.renderButton(container, { theme: 'outline', size: 'large', width, text: 'signin_with', shape: 'rectangular' });
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-  // Wait a small moment to ensure google library is loaded if deferred
-  const checkGoogle = setInterval(() => {
-    if (typeof google !== 'undefined' && google.accounts && google.accounts.id) {
-      clearInterval(checkGoogle);
-      initGoogleSignIn();
-    }
-  }, 100);
-});
+(function waitForGoogle(attempt = 0) {
+  if (window.google && google.accounts && google.accounts.id) return initGoogleSignIn();
+  if (attempt > 100) { // ~10 s: script blocked (ad blocker, offline)
+    const c = document.getElementById('googleButtonContainer');
+    if (c) c.innerHTML = '<span style="font-size:12px;color:var(--text-muted)">Google sign-in is unavailable (script blocked or offline).</span>';
+    return;
+  }
+  setTimeout(() => waitForGoogle(attempt + 1), 100);
+})();
 
 const aiFabBtn = document.getElementById('aiFabBtn');
 const aiWidgetPanel = document.getElementById('aiWidgetPanel');
@@ -143,97 +224,28 @@ if (aiFabBtn && aiWidgetPanel && aiCloseBtn) {
 async function doLogin() {
   const username = document.getElementById('inUser').value.trim();
   const password = document.getElementById('inPass').value;
-  const role = document.getElementById('inRole').value;
-  const errEl = document.getElementById('loginError');
-  errEl.classList.remove('show');
+  showLoginError('');
 
-  if (!username || !password) {
-    errEl.textContent = 'Please enter your username and password.';
-    errEl.classList.add('show');
-    return;
-  }
+  if (!username || !password) return showLoginError('Please enter your username and password.');
 
-  // Show loading state
   const loginBtn = document.getElementById('btnLogin');
   const originalText = loginBtn.textContent;
   loginBtn.textContent = 'Signing in...';
   loginBtn.disabled = true;
 
   try {
-    const loginAbort = new AbortController();
-    setTimeout(() => loginAbort.abort(), 15000);
-    const res = await fetch(API + '/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password }),
-      signal: loginAbort.signal
-    });
-    const data = await res.json();
-
-    if (!res.ok) {
-      errEl.textContent = data.error || 'Invalid username or password.';
-      errEl.classList.add('show');
-      loginBtn.textContent = originalText;
-      loginBtn.disabled = false;
-      return;
-    }
-
-    // Successful login
-    authToken = data.token;
-    currentUser = data.user;
-    document.getElementById('sbName').textContent = currentUser.name || username;
-
-    let displayRole = 'Administrator';
-    if (currentUser.role === 'farmer') displayRole = 'Farmer / Extension';
-    if (currentUser.role === 'government' || currentUser.role === 'policy') displayRole = 'Gov / Policy';
-    if (currentUser.role === 'researcher') displayRole = 'Researcher';
-
-    document.getElementById('sbRole').textContent = displayRole;
-    document.getElementById('sbAvatar').textContent = (currentUser.name || username).substring(0, 2).toUpperCase();
-
-    document.getElementById('loginScreen').classList.add('out');
-    setTimeout(() => { document.getElementById('appShell').classList.add('on'); }, 400);
-    loadDashboard();
-    initMapOnce();
-
-    // Log activity
-    try {
-      fetch(API + '/activity/log', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
-        body: JSON.stringify({ action: 'login', details: 'User logged in via credentials' })
-      });
-    } catch(e) {}
-
+    const { res, data } = await postJson('/auth/login', { username, password });
+    if (!res.ok) return showLoginError(data.error || 'Invalid username or password.');
+    const remember = document.getElementById('rememberMe');
+    document.getElementById('inPass').value = '';
+    enterApp(data, { remember: remember ? remember.checked : true, action: 'login' });
   } catch (err) {
-    // Server-connection issues are logged silently — no error banner shown to the user.
     console.error('Login request failed:', err);
-    errEl.classList.remove('show');
-    errEl.textContent = '';
+    showLoginError(networkErrorMessage(err));
+  } finally {
     loginBtn.textContent = originalText;
     loginBtn.disabled = false;
   }
-}
-
-function doLogout() {
-  // Log activity before clearing token
-  if (authToken && authToken !== 'google-local-token') {
-    try {
-      fetch(API + '/activity/log', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
-        body: JSON.stringify({ action: 'logout', details: 'User logged out' })
-      });
-    } catch(e) {}
-  }
-  authToken = null; currentUser = null;
-  document.getElementById('appShell').classList.remove('on');
-  setTimeout(() => { document.getElementById('loginScreen').classList.remove('out'); }, 400);
-  // Clear login fields
-  document.getElementById('inUser').value = '';
-  document.getElementById('inPass').value = '';
-  const errEl = document.getElementById('loginError');
-  if (errEl) { errEl.classList.remove('show'); errEl.textContent = ''; }
 }
 
 // ─── REGISTRATION ───────────────────────────────────────
@@ -244,65 +256,28 @@ async function doRegister() {
   const password = document.getElementById('regPassword').value;
   const region = document.getElementById('regRegion').value;
   const errEl = document.getElementById('registerError');
-  errEl.classList.remove('show');
+  const btn = document.getElementById('btnRegister');
+  const fail = msg => { errEl.className = 'register-error show'; errEl.style.display = 'block'; errEl.textContent = msg; };
+  errEl.className = 'register-error';
+  errEl.style.display = 'none';
 
-  if (!name || !email || !username || !password) {
-    errEl.textContent = 'All fields are required.';
-    errEl.classList.add('show');
-    return;
-  }
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    errEl.textContent = 'Please enter a valid email address.';
-    errEl.classList.add('show');
-    return;
-  }
-  if (password.length < 6) {
-    errEl.textContent = 'Password must be at least 6 characters.';
-    errEl.classList.add('show');
-    return;
-  }
+  if (!name || !email || !username || !password) return fail('All fields are required.');
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return fail('Please enter a valid email address.');
+  if (!/^[a-zA-Z0-9._-]{3,32}$/.test(username)) return fail('Username must be 3-32 letters, numbers, dots, dashes or underscores.');
+  if (password.length < 8) return fail('Password must be at least 8 characters.');
 
+  btn.disabled = true;
   try {
-    const regAbort = new AbortController();
-    setTimeout(() => regAbort.abort(), 3000);
-    const res = await fetch(API + '/auth/register', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, email, username, password, region }),
-      signal: regAbort.signal
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      errEl.textContent = data.error || 'Registration failed. Please try again.';
-      errEl.classList.add('show');
-      return;
-    }
-    // Success — show success message and close modal
-    errEl.className = 'register-success';
-    errEl.textContent = '✅ Account created! You can now log in with your credentials.';
-    errEl.style.display = 'block';
-    setTimeout(() => {
-      document.getElementById('registerModal').classList.remove('show');
-      errEl.className = 'register-error';
-      errEl.style.display = 'none';
-      // Pre-fill login with new credentials
-      document.getElementById('inUser').value = username;
-      document.getElementById('inPass').value = '';
-      document.getElementById('inPass').focus();
-    }, 2000);
+    const { res, data } = await postJson('/auth/register', { name, email, username, password, region });
+    if (!res.ok) return fail(data.error || 'Registration failed. Please try again.');
+    document.getElementById('registerModal').classList.remove('show');
+    ['regName', 'regEmail', 'regUsername', 'regPassword'].forEach(id => { document.getElementById(id).value = ''; });
+    enterApp(data, { remember: true, action: 'register' });
   } catch (err) {
-    console.error('Backend unreachable:', err);
-    errEl.className = 'register-error';
-    errEl.textContent = 'Server connection failed. Please check your internet and try again.';
-    errEl.style.display = 'block';
-    setTimeout(() => {
-      document.getElementById('registerModal').classList.remove('show');
-      errEl.className = 'register-error';
-      errEl.style.display = 'none';
-      document.getElementById('inUser').value = username;
-      document.getElementById('inPass').value = '';
-      document.getElementById('inPass').focus();
-    }, 2000);
+    console.error('Registration failed:', err);
+    fail(networkErrorMessage(err));
+  } finally {
+    btn.disabled = false;
   }
 }
 window.doRegister = doRegister;
@@ -387,14 +362,13 @@ document.querySelectorAll('.tab-bar').forEach(bar => {
 // ─── FETCH HELPER ───
 async function apiFetch(path) {
   try {
-    const h = authToken && authToken !== 'demo-token' ? { 'Authorization': 'Bearer ' + authToken } : {};
-    const abort = new AbortController();
-    setTimeout(() => abort.abort(), 2500);
-    const res = await fetch(API + path, { headers: h, signal: abort.signal });
-    if (!res.ok) throw new Error('Backend non-200');
+    // The news endpoint aggregates ~25 feeds on a cold cache, so it gets longer.
+    const res = await fetch(API + path, { headers: authHeaders(), signal: AbortSignal.timeout(path === '/news' ? 30000 : 12000) });
+    if (res.status === 401) { handleExpiredSession(); return null; }
+    if (!res.ok) throw new Error('Backend returned ' + res.status);
     return await res.json();
-  } catch {
-    console.warn('Backend unreachable. Using static fallback data for:', path);
+  } catch (err) {
+    console.warn('Backend unreachable (' + err.message + '). Using static fallback data for:', path);
     // Map paths to static JSON files
     const map = {
       '/dashboard/stats': 'data/stats.json',
@@ -893,13 +867,15 @@ function initMapOnce() {
     .catch(err => console.error("GeoJSON error: ", err));
 
   // Filters setup
-  document.getElementById('mapChips').innerHTML = ['NDVI','Soil Moisture','Rainfall','Food Security','Water Bodies'].map((l,i) => `<div class="chip${i===0?' on':''}" onclick="this.classList.toggle('on')">${l}</div>`).join('');
+  const mapChips = document.getElementById('mapChips');
+  if (mapChips) mapChips.innerHTML = ['NDVI','Soil Moisture','Rainfall','Food Security','Water Bodies'].map((l,i) => `<div class="chip${i===0?' on':''}" onclick="this.classList.toggle('on')">${l}</div>`).join('');
 
   showMapOverview();
 }
 
 function showMapOverview() {
-  document.getElementById('mapDetail').innerHTML = `
+  const mapDetail = document.getElementById('mapDetail');
+  if (mapDetail) mapDetail.innerHTML = `
     <h3>🌍 Global Overview</h3>
     <div class="md-row"><span class="md-l">Monitored Area</span><span class="md-v">148.9M km²</span></div>
     <div class="md-row"><span class="md-l">Active Regions</span><span class="md-v" title="GEOGLAM Crop Monitor regions + FAO GAUL admin-1 units with active EO coverage">196 <span style='font-size:9px;color:var(--text-muted);cursor:help' title='GEOGLAM Crop Monitor regions aligned with FAO GAUL admin-1 administrative boundaries'>(?)</span></span></div>
@@ -915,7 +891,8 @@ function showMapOverview() {
 function showCountryDetail(co) {
   const fc = {'Phase 1':'var(--accent-green)','Phase 2':'var(--accent-amber)','Phase 3':'var(--accent-red)','Phase 4':'#d73027'};
   const ndviCol = co.ndvi>=0.6?'var(--accent-green)':co.ndvi>=0.4?'var(--accent-amber)':'var(--accent-red)';
-  document.getElementById('mapDetail').innerHTML = `
+  const mapDetail = document.getElementById('mapDetail');
+  if (mapDetail) mapDetail.innerHTML = `
     <h3 style="cursor:pointer" onclick="showMapOverview()">← ${co.name}</h3>
     <div style="font-size:11px;color:var(--text-muted);margin-bottom:12px">Population: ${co.pop}</div>
     <div class="md-row"><span class="md-l">NDVI Index</span><span class="md-v" style="color:${ndviCol}">${co.ndvi}</span></div>
@@ -1154,7 +1131,7 @@ async function handleUserMsg() {
   try {
     const response = await fetch(API + '/ai/chat', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({ messages: chatHistory.slice(-20) })
     });
 
@@ -1303,9 +1280,7 @@ async function loadAdminUsers() {
   if (!panel || !list) return;
 
   try {
-    const res = await fetch(API + '/admin/users', {
-      headers: authToken ? { 'Authorization': 'Bearer ' + authToken } : {}
-    });
+    const res = await fetch(API + '/admin/users', { headers: authHeaders() });
     if (!res.ok) {
       panel.style.display = 'block';
       list.innerHTML = '<div style="padding:12px;font-size:13px;color:var(--text-muted)">Unable to load user data. Admin access required.</div>';
@@ -1328,16 +1303,20 @@ async function loadAdminUsers() {
       const roleClass = roleBg[u.role] || 'researcher';
       const registeredAt = u.registeredAt ? new Date(u.registeredAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Pre-registered';
       return `<div class="user-profile-card">
-        <div class="upc-avatar">${initials}</div>
+        <div class="upc-avatar">${escapeHtml(initials)}</div>
         <div class="upc-info">
-          <div class="upc-name">${u.name || u.username}</div>
-          <div class="upc-email">${u.email || 'No email'}</div>
+          <div class="upc-name">${escapeHtml(u.name || u.username)}</div>
+          <div class="upc-email">${escapeHtml(u.email || 'No email')}${u.authProvider === 'google' ? ' · Google' : ''}</div>
           <div class="upc-meta">
-            <span>📍 ${u.region || 'Global'}</span>
+            <span>📍 ${escapeHtml(u.region || 'Global')}</span>
             <span>📅 ${registeredAt}</span>
           </div>
         </div>
-        <span class="upc-badge ${roleClass}">${(u.role || 'user').toUpperCase()}</span>
+        ${String(u.id) === String(currentUser && currentUser.id)
+          ? `<span class="upc-badge ${roleClass}">${escapeHtml((u.role || 'user').toUpperCase())}</span>`
+          : `<select class="emhare-select upc-role" style="width:auto;font-size:12px;padding:4px 8px" onchange="changeUserRole('${escapeHtml(u.id)}', this)" aria-label="Role for ${escapeHtml(u.name || u.username)}">
+              ${['researcher', 'farmer', 'policy', 'admin'].map(r => `<option value="${r}"${u.role === r ? ' selected' : ''}>${ROLE_LABELS[r]}</option>`).join('')}
+            </select>`}
       </div>`;
     }).join('');
   } catch (err) {
@@ -1347,6 +1326,19 @@ async function loadAdminUsers() {
   }
 }
 
+async function changeUserRole(id, select) {
+  select.disabled = true;
+  try {
+    const { res, data } = await postJson('/admin/users/' + encodeURIComponent(id) + '/role', { role: select.value });
+    if (!res.ok) { alert(data.error || 'Could not change role.'); loadAdminUsers(); }
+  } catch (err) {
+    alert(networkErrorMessage(err));
+    loadAdminUsers();
+  } finally {
+    select.disabled = false;
+  }
+}
+window.changeUserRole = changeUserRole;
 
 // ─── SITE INTELLIGENCE PAGE LOGIC ───
 let siMap = null;
@@ -1890,7 +1882,7 @@ async function generateWafeoReport() {
   const prompt = `Write a concise professional executive summary (about 150 words) for an Earth-observation report on ${region}. Data: current 12-month average NDVI ${m.curAvg != null ? m.curAvg.toFixed(3) : 'n/a'}, year-over-year change ${m.yoy != null ? m.yoy.toFixed(1) + '%' : 'n/a'}, 6-month forecast average NDVI ${m.fcAvg != null ? m.fcAvg.toFixed(3) : 'n/a'} (${m.fcChange != null ? m.fcChange.toFixed(1) + '%' : 'n/a'} vs current), peak vegetation around ${m.peak || 'n/a'}. Cover vegetation health, likely water and food-security implications, and one clear recommendation. Plain paragraphs, no headings.`;
   let text;
   try {
-    const r = await fetch(API + '/ai/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ messages: [{ role: 'user', content: prompt }] }) });
+    const r = await fetch(API + '/ai/chat', { method: 'POST', headers: authHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify({ messages: [{ role: 'user', content: prompt }] }) });
     const d = await r.json().catch(() => ({}));
     text = d.reply || templateSummary(region, m);
   } catch (e) {
@@ -1910,7 +1902,7 @@ async function saveCurrentReport() {
   try {
     const r = await fetch(API + '/reports', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken }, body: JSON.stringify(rep) });
     const d = await r.json().catch(() => ({}));
-    if (d.saved) { if (status) status.textContent = '✓ Saved to Firestore'; loadSavedReports(); }
+    if (d.saved) { if (status) status.textContent = d.persistent === false ? '✓ Saved (local dev: kept until server restart)' : '✓ Saved'; loadSavedReports(); }
     else if (status) status.textContent = d.message || 'Firestore unavailable — not saved.';
   } catch (e) { if (status) status.textContent = 'Save failed: ' + e.message; }
 }
@@ -1923,7 +1915,7 @@ async function loadSavedReports() {
     const d = await r.json().catch(() => ({ reports: [] }));
     if (!d.reports || !d.reports.length) { list.innerHTML = '<div style="font-size:12px;color:var(--text-muted)">No saved reports yet.</div>'; return; }
     list.innerHTML = '<h4 style="color:var(--accent-blue);font-size:14px;margin:8px 0;">Saved Records (' + d.reports.length + ')</h4>' +
-      d.reports.map(x => `<div class="saved-report-row"><span>📄 ${x.title || 'Report'} — <em>${x.region || ''}</em></span><span style="color:var(--text-muted)">${(x.createdAt || '').slice(0, 10)}</span></div>`).join('');
+      d.reports.map(x => `<div class="saved-report-row"><span>📄 ${escapeHtml(x.title || 'Report')} — <em>${escapeHtml(x.region || '')}</em></span><span style="color:var(--text-muted)">${escapeHtml((x.createdAt || '').slice(0, 10))}</span></div>`).join('');
   } catch (e) { /* ignore */ }
 }
 
