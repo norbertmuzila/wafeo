@@ -12,7 +12,8 @@ automatically (role `researcher`). Admins can change roles in **Settings → Reg
 
 ```
 index.html, style.css, app.js   Frontend (single-page app, no build step)
-assets/                         Logo and static images
+landing.css, landing.js         Home page: pinned scroll hero, sections, hand-off to sign-in
+assets/                         Logo and static images (assets/landing/ = home page photo)
 data/*.json                     Reference datasets + local user store
 server.js                       Local entry point: `npm start`
 api/index.js                    Vercel serverless entry (same app)

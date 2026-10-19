@@ -19,6 +19,14 @@
       "use": "@vercel/static"
     },
     {
+      "src": "landing.js",
+      "use": "@vercel/static"
+    },
+    {
+      "src": "landing.css",
+      "use": "@vercel/static"
+    },
+    {
       "src": "assets/**",
       "use": "@vercel/static"
     }

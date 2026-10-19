@@ -3,12 +3,15 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>WAFEO</title>
+<title>WAFEO · See water. Grow food. Save lives.</title>
+<meta name="description" content="WAFEO turns satellite data into field-level intelligence on water, crops and food security.">
+<meta property="og:image" content="assets/landing/field-hero.webp">
+<link rel="preload" as="image" href="assets/landing/field-hero.webp" fetchpriority="high">
 <link rel="icon" type="image/svg+xml" href="assets/wafeo-logo.svg">
 <link rel="apple-touch-icon" href="assets/wafeo-logo.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;1,9..144,300;1,9..144,400&family=Inter:wght@400;500;600&family=Space+Mono&family=Cinzel:wght@500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 <!-- Google Identity Services -->
@@ -18,14 +21,234 @@
 <!-- TensorFlow.js for the LSTM NDVI forecast -->
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.20.0/dist/tf.min.js"></script>
 <link rel="stylesheet" href="style.css?v=18">
+<link rel="stylesheet" href="landing.css?v=1">
 </head>
 <body>
+
+<!-- ═══════════════ LANDING (home page) ═══════════════ -->
+<div id="landing" aria-label="WAFEO home">
+  <div id="landingContent">
+
+    <nav class="lp-nav" id="lpNav">
+      <a class="lp-brand" href="#" data-lp-goto="top" aria-label="WAFEO home">
+        <img src="assets/wafeo-logo.svg" alt="">
+        <span>WAFEO</span>
+      </a>
+      <div class="lp-links">
+        <a href="#" data-lp-goto="method">Method</a>
+        <a href="#" data-lp-goto="platform">Platform</a>
+        <a href="#" data-lp-goto="analyst">Analyst</a>
+        <a href="#" data-lp-goto="about">About</a>
+      </div>
+      <button class="lp-btn lp-btn-leaf" data-lp-enter>
+        <span data-lp-cta-label>Sign in</span>
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 8h10M9 4l4 4-4 4"/></svg>
+      </button>
+    </nav>
+
+    <aside class="lp-rail" id="lpRail" aria-label="Page sections">
+      <div class="lp-rail-fill" id="lpRailFill"></div>
+    </aside>
+
+    <!-- HERO: pinned scroll sequence over the field photo -->
+    <section class="lp-hero" id="lp-top" data-lp-section="top" data-lp-label="WAFEO">
+      <div class="lp-stage" id="lpStage">
+        <div class="lp-intro">
+          <div class="lp-imgwrap" id="lpImg">
+            <img src="assets/landing/field-hero.webp" alt="Rows of young soybean plants stretching to the horizon under a blue sky" fetchpriority="high">
+            <svg class="lp-field-svg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+              <polygon id="lpField" points="41,47 59,47 74,96 26,96" pathLength="1"/>
+              <circle id="lpPin" cx="50" cy="70" r="0.9"/>
+            </svg>
+          </div>
+        </div>
+        <div class="lp-shade"></div>
+        <div class="lp-dim" id="lpDim"></div>
+        <div class="lp-scan"></div>
+        <div class="lp-grain"></div>
+
+        <div class="lp-reticle" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+
+        <div class="lp-hud" id="lpHud" aria-hidden="true">
+          <div>Target · Field 07 · Rift Valley</div>
+          <div class="lp-status"><i></i><span id="lpStatus">Acquiring</span></div>
+          <div class="lp-coords" id="lpCoords">LAT —.——— · LON —.———</div>
+        </div>
+
+        <!-- Stage A: headline -->
+        <div class="lp-layer lp-layer-a" id="lpLayerA">
+          <h1 class="lp-h1">
+            <span class="lp-mask" style="--d:150ms"><span>See water. Grow food.</span></span>
+            <span class="lp-mask" style="--d:300ms"><span><em>Save lives.</em></span></span>
+          </h1>
+          <p class="lp-lede lp-reveal" style="--d:520ms">WAFEO turns every satellite pass into field-level intelligence on water, crops and food security. Traceable to the reading, from a single farm to a whole continent.</p>
+          <div class="lp-cta-row lp-reveal" style="--d:680ms">
+            <button class="lp-btn lp-btn-leaf" data-lp-enter>
+              <span data-lp-cta-label>Enter the platform</span>
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 8h10M9 4l4 4-4 4"/></svg>
+            </button>
+            <button class="lp-btn lp-btn-ghost" data-lp-goto="method">How it works</button>
+          </div>
+        </div>
+        <button class="lp-descend" id="lpDescend" data-lp-goto="stakes" aria-label="Scroll down"><span>Scroll to descend</span><i></i></button>
+
+        <!-- Stage B: the stakes -->
+        <div class="lp-layer lp-layer-b lp-dark" id="lpLayerB">
+          <div class="lp-wrap" style="width:100%">
+            <div class="lp-eyebrow">The stakes</div>
+            <h2 class="lp-h2">Harvests are counted once a season.<br><em>Satellites watch every week.</em></h2>
+            <p class="lp-lede">By the time a failed harvest shows up in the statistics, the window to act has closed. Earth observation sees the stress while there is still time.</p>
+            <div class="lp-stats">
+              <div class="lp-stat"><b data-count="295" data-suffix="M">0</b><span>Acutely food insecure</span><small>people across 53 countries in 2024</small></div>
+              <div class="lp-stat"><b data-count="70" data-suffix="%">0</b><span>Water to agriculture</span><small>of all freshwater withdrawals worldwide</small></div>
+              <div class="lp-stat"><b data-count="33" data-suffix="%">0</b><span>Soils degraded</span><small>moderately to highly, eroding future yields</small></div>
+              <div class="lp-stat"><b data-count="18" data-suffix="">0</b><span>Live EO sources</span><small>tracked by WAFEO, optical, radar and thermal</small></div>
+            </div>
+            <div class="lp-sources">Sources · Global Report on Food Crises 2025 · FAO AQUASTAT · FAO Status of the World's Soil Resources · WAFEO live feed</div>
+          </div>
+        </div>
+
+        <!-- Stage C: descend into one field -->
+        <div class="lp-layer lp-layer-c lp-dark" id="lpLayerC">
+          <div class="lp-c-title">
+            <div class="lp-eyebrow">One field, read from orbit</div>
+            <h2 class="lp-h2">Every row has a<br><em>reading you can trust.</em></h2>
+          </div>
+          <div class="lp-readout">
+            <header>
+              <div>
+                <div class="lp-eyebrow">Sample field</div>
+                <h3>Field 07 · Soybean</h3>
+                <div class="lp-place">Rift Valley, Kenya · 42.6 ha</div>
+              </div>
+              <span class="lp-chip">HEALTHY</span>
+            </header>
+            <div class="lp-ndvi"><b data-count="0.78" data-decimals="2" id="lpNdvi">0.00</b><span>NDVI · Sentinel-2</span></div>
+            <div class="lp-bar"><i id="lpNdviMark"></i></div>
+            <div class="lp-metrics">
+              <div>Soil moisture<strong>31 %</strong></div>
+              <div>Rainfall, 30 d<strong>84 mm</strong></div>
+              <div>Canopy trend<strong>+6 % / 14 d</strong></div>
+              <div>Water stress<strong>Low</strong></div>
+            </div>
+            <footer>Illustrative reading · confidence 0.92 · built from real measurement types</footer>
+          </div>
+        </div>
+
+        <div class="lp-handoff" id="lpHandoff"></div>
+      </div>
+    </section>
+
+    <!-- METHOD -->
+    <section class="lp-section lp-grid-bg" id="lp-method" data-lp-section="method" data-lp-label="Method">
+      <div class="lp-wrap">
+        <div class="lp-eyebrow lp-reveal">How it works</div>
+        <h2 class="lp-h2">
+          <span class="lp-mask" style="--d:60ms"><span>From a satellite pass</span></span>
+          <span class="lp-mask" style="--d:180ms"><span><em>to a decision on the ground.</em></span></span>
+        </h2>
+        <p class="lp-lede lp-reveal" style="--d:260ms">Open Earth-observation data in, one clear answer out. Pick an instrument to see what it measures and which part of WAFEO it powers.</p>
+
+        <div class="lp-steps">
+          <div class="lp-step lp-reveal" style="--d:0ms"><b>01</b><h3>Locate</h3><p>Every farm, basin and district becomes a precise shape on the map.</p></div>
+          <div class="lp-step lp-reveal" style="--d:120ms"><b>02</b><h3>Measure</h3><p>Each pass reads the surface in optical, radar, thermal and gravity data.</p></div>
+          <div class="lp-step lp-reveal" style="--d:240ms"><b>03</b><h3>Score</h3><p>Readings fuse into vegetation, water and food-security indicators.</p></div>
+          <div class="lp-step lp-reveal" style="--d:360ms"><b>04</b><h3>Act</h3><p>Alerts, forecasts and reports reach farmers, ministries and responders.</p></div>
+        </div>
+
+        <div class="lp-instruments lp-reveal">
+          <div class="lp-tabs" role="tablist" id="lpTabs" aria-label="Satellite instruments"></div>
+          <div class="lp-panel" id="lpPanel" role="tabpanel"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- PLATFORM -->
+    <section class="lp-section" id="lp-platform" data-lp-section="platform" data-lp-label="Platform" style="background:var(--lp-bone-2)">
+      <div class="lp-wrap">
+        <div class="lp-eyebrow lp-reveal">The platform</div>
+        <h2 class="lp-h2">
+          <span class="lp-mask" style="--d:60ms"><span>Ten workspaces.</span></span>
+          <span class="lp-mask" style="--d:180ms"><span><em>One living picture of the land.</em></span></span>
+        </h2>
+        <div class="lp-modules" id="lpModules"></div>
+      </div>
+    </section>
+
+    <!-- ANALYST -->
+    <section class="lp-section lp-grid-bg" id="lp-analyst" data-lp-section="analyst" data-lp-label="Analyst">
+      <div class="lp-wrap lp-analyst">
+        <div>
+          <div class="lp-eyebrow lp-reveal">The analyst</div>
+          <h2 class="lp-h2">
+            <span class="lp-mask" style="--d:60ms"><span>Ask in plain words.</span></span>
+            <span class="lp-mask" style="--d:180ms"><span><em>Get answers you can cite.</em></span></span>
+          </h2>
+          <p class="lp-lede lp-reveal" style="--d:260ms">The WAFEO assistant sits on top of every layer. Plain questions in, numbers out, each with its source and date.</p>
+          <div class="lp-principles">
+            <div class="lp-reveal" style="--d:0ms"><b>01</b><div><strong>Measured, not guessed</strong><span>Answers come from satellite readings over the place you ask about.</span></div></div>
+            <div class="lp-reveal" style="--d:100ms"><b>02</b><div><strong>Labelled</strong><span>Every line says whether it is an observation or a recommendation.</span></div></div>
+            <div class="lp-reveal" style="--d:200ms"><b>03</b><div><strong>Sourced</strong><span>Instrument, date and confidence travel with each figure.</span></div></div>
+          </div>
+        </div>
+        <div class="lp-chat lp-reveal" style="--d:200ms" id="lpChat">
+          <div class="lp-chat-head"><i>✦</i><div><b>WAFEO Assistant</b><small>Grounded in your field data</small></div><span class="lp-live"></span></div>
+          <div class="lp-chat-body" id="lpChatBody"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ABOUT -->
+    <section class="lp-section" id="lp-about" data-lp-section="about" data-lp-label="About" style="background:var(--lp-bone-2)">
+      <div class="lp-wrap lp-about">
+        <div>
+          <div class="lp-eyebrow lp-reveal">About</div>
+          <p class="lp-quote lp-reveal" style="--d:120ms">We built WAFEO on a simple belief: every farmer, water manager and ministry deserves to <em>see what the satellites see</em>, in time to act on it.</p>
+          <p class="lp-lede lp-reveal" style="--d:220ms">WAFEO joins open data from Copernicus, NASA and partners into one digital twin of water, agriculture and food systems, starting with Africa and growing to every continent.</p>
+          <div class="lp-person lp-reveal" style="--d:320ms"><i>N</i><div><b>Norbert Muzila</b><small>Creator of WAFEO · Earth observation &amp; data</small></div></div>
+        </div>
+        <figure class="lp-photo lp-reveal" style="margin:0">
+          <img src="assets/landing/field-hero.webp" alt="Soybean field in early growth" loading="lazy">
+          <figcaption>Ground truth · the rows behind the pixels</figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <!-- FINAL CTA -->
+    <section class="lp-final lp-dark" id="lp-start" data-lp-section="start" data-lp-label="Start">
+      <div class="lp-final-bg" id="lpFinalBg"></div>
+      <div class="lp-wrap" style="position:relative">
+        <div class="lp-eyebrow lp-reveal">Get started</div>
+        <h2 class="lp-h2">
+          <span class="lp-mask" style="--d:60ms"><span>Pick a field.</span></span>
+          <span class="lp-mask" style="--d:180ms"><span><em>We'll show you what orbit sees.</em></span></span>
+        </h2>
+        <p class="lp-lede lp-reveal" style="--d:260ms">Sign in with any Google account or create a free account. Your dashboard opens on the live global picture.</p>
+        <div class="lp-cta-row lp-reveal" style="--d:360ms">
+          <button class="lp-btn lp-btn-leaf" data-lp-enter>
+            <span data-lp-cta-label>Enter the platform</span>
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 8h10M9 4l4 4-4 4"/></svg>
+          </button>
+          <button class="lp-btn lp-btn-ghost" data-lp-enter="register">Create an account</button>
+        </div>
+      </div>
+    </section>
+
+    <footer class="lp-footer">
+      <span>© 2026 <b>WAFEO</b> · Created by Norbert Muzila</span>
+      <span class="lp-mono">Water · Agriculture · Food security · EO</span>
+      <span class="lp-mono">Powered by Copernicus &amp; NASA open data</span>
+    </footer>
+  </div>
+</div>
+
 
 <!-- ═══════════════ LOGIN ═══════════════ -->
 <div id="loginScreen">
 
 
     <div class="login-card-simple">
+      <button type="button" class="lp-home-link" onclick="wafeoShowHome()">&larr; Back to home</button>
       <div style="display:flex; justify-content:center; margin-bottom: 20px;">
         <div class="waf-brand">
           <img src="assets/wafeo-logo.svg" alt="WAFEO logo" class="waf-logo-img">
@@ -810,6 +1033,8 @@
   </div>
 </div>
 
-<script src="app.js?v=16"></script>
+<script src="app.js?v=17"></script>
+<script src="https://cdn.jsdelivr.net/npm/lenis@1.1.13/dist/lenis.min.js"></script>
+<script src="landing.js?v=1"></script>
 </body>
 </html>

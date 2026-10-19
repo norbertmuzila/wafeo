@@ -107,6 +107,7 @@ function enterApp(session, { remember = true, action = null } = {}) {
   Promise.resolve().then(loadDashboard).catch(err => console.error('Dashboard load failed:', err));
   try { initMapOnce(); } catch (err) { console.error('Map init failed:', err); }
   if (action) logActivity(action, `Signed in (${currentUser.email || currentUser.username})`);
+  document.dispatchEvent(new CustomEvent('wafeo:auth'));
 }
 
 function doLogout() {

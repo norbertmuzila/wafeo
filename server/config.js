@@ -24,7 +24,17 @@ function resolveJwtSecret() {
     return { secret: derived, source: 'derived from FIREBASE_PRIVATE_KEY' };
   }
   if (!isProduction) {
-    return { secret: crypto.randomBytes(32).toString('hex'), source: 'random (dev only; sessions reset on restart)' };
+    // Local development: a random secret kept in a git-ignored file so
+    // sessions survive dev-server restarts.
+    const file = require('path').join(__dirname, '..', '.dev-jwt-secret');
+    const fs = require('fs');
+    try {
+      return { secret: fs.readFileSync(file, 'utf8').trim(), source: 'local dev secret (.dev-jwt-secret)' };
+    } catch {
+      const secret = crypto.randomBytes(32).toString('hex');
+      try { fs.writeFileSync(file, secret); } catch {}
+      return { secret, source: 'local dev secret (new)' };
+    }
   }
   return { secret: null, source: 'missing' };
 }
