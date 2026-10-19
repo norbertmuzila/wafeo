@@ -20,7 +20,7 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <!-- TensorFlow.js for the LSTM NDVI forecast -->
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.20.0/dist/tf.min.js"></script>
-<link rel="stylesheet" href="style.css?v=19">
+<link rel="stylesheet" href="style.css?v=20">
 <link rel="stylesheet" href="landing.css?v=2">
 </head>
 <body>
@@ -533,198 +533,40 @@
               </div>
             </div>
 
-            <!-- Satellite External API Controls -->
-            <details class="sat-dropdown" style="background: var(--bg-primary); border-radius: 4px; box-shadow: 0 1px 4px rgba(0,0,0,0.3); border: 1px solid var(--border);">
-              <summary style="font-size:11px; font-weight:700; color:var(--text-muted); text-transform:uppercase; padding:10px; cursor:pointer; list-style:none; display:flex; justify-content:space-between; align-items:center;">
-                <span>Satellite Data Sources</span><span class="dd-icon">▼</span>
-              </summary>
-              <div style="display:flex; flex-direction:column; gap:8px; padding: 0 10px 10px 10px;">
-                <label style="font-size:12px; display:flex; align-items:center; cursor:pointer;">
-                  <input type="checkbox" id="sat-nasa" style="margin-right:6px;" onchange="toggleNasaGibs()"> NASA GIBS (Live)
-                </label>
-                <label style="font-size:12px; display:flex; align-items:center; cursor:pointer; font-weight:600;">
-                  <input type="checkbox" id="sat-nisar" style="margin-right:6px;" disabled> NISAR 200m Soil Moisture 🆕
-                </label>
-                <label style="font-size:12px; display:flex; align-items:center; cursor:pointer; color:var(--text-muted);" onclick="alertApiKey('PlanetScope Explorer')">
-                  <input type="checkbox" disabled style="margin-right:6px;"> PlanetScope (3m) 🔒
-                </label>
-                <label style="font-size:12px; display:flex; align-items:center; cursor:pointer;">
-                  <input type="checkbox" id="sat-gee" style="margin-right:6px;" disabled> Earth Engine (Free Tier)
-                </label>
-                <label style="font-size:12px; display:flex; align-items:center; cursor:pointer;">
-                  <input type="checkbox" id="sat-cdse" style="margin-right:6px;" disabled> Copernicus CDSE (Free)
-                </label>
-              </div>
-            </details>
+            <!-- Live imagery layer -->
+            <label class="lv-map-toggle"><input type="checkbox" id="sat-nasa" onchange="toggleNasaGibs()"> NASA daily satellite image (GIBS)</label>
           </div>
 
-          <div class="map-legend-box" style="position: absolute; bottom: 20px; left: 20px; z-index: 1000; background: var(--bg-primary); padding: 12px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); border: 1px solid var(--border);">
-            <h4 style="margin: 0 0 8px 0; font-size: 13px;">Vegetation Health (NDVI)</h4>
-            <div class="lg-item" style="font-size: 12px; margin-bottom: 4px; display: flex; align-items: center;"><div style="width: 12px; height: 12px; background: #003366; margin-right: 8px; border-radius: 2px;"></div>Excellent</div>
-            <div class="lg-item" style="font-size: 12px; margin-bottom: 4px; display: flex; align-items: center;"><div style="width: 12px; height: 12px; background: #22c55e; margin-right: 8px; border-radius: 2px;"></div>Good</div>
-            <div class="lg-item" style="font-size: 12px; margin-bottom: 4px; display: flex; align-items: center;"><div style="width: 12px; height: 12px; background: #eab308; margin-right: 8px; border-radius: 2px;"></div>Moderate</div>
-            <div class="lg-item" style="font-size: 12px; margin-bottom: 4px; display: flex; align-items: center;"><div style="width: 12px; height: 12px; background: #f59d1f; margin-right: 8px; border-radius: 2px;"></div>Stressed</div>
-            <div class="lg-item" style="font-size: 12px; display: flex; align-items: center;"><div style="width: 12px; height: 12px; background: #ef4444; margin-right: 8px; border-radius: 2px;"></div>Drought</div>
+          <div class="map-legend-box lv-map-legend">
+            <h4>Live hazard alerts (GDACS)</h4>
+            <div><i style="background:#d93025"></i>Red: severe</div>
+            <div><i style="background:#f29900"></i>Orange: moderate</div>
+            <div><i style="background:#34a853"></i>Green: minor</div>
+            <div><i style="background:#9BE07A;border:2px solid #3F8F3A"></i>Your analysed area</div>
+            <div class="lv-map-hint">Click anywhere to analyse that place</div>
           </div>
         </div>
-        <div class="stats-grid" id="statsGrid"></div>
-        <div class="grid-2">
-          <div class="panel" id="alertsPanel"></div>
-          <div class="panel" id="ndviPanel"></div>
-          <div class="panel" id="waterPanel"></div>
-          <div class="panel" id="foodPanel"></div>
-          <div class="panel full" id="satPanel"></div>
-        </div>
+        <div class="lv-host"></div>
       </div>
     </div>
 
 
 
-    <!-- ═══ PRECISION FARMING ═══ -->
-    <div class="page" id="pg-precision-farming">
-      <div class="pg-pad">
-        <div class="tab-bar">
-          <button class="tab-btn active">All Fields</button>
-          <button class="tab-btn">NDVI Analysis</button>
-          <button class="tab-btn">Irrigation</button>
-          <button class="tab-btn">Yield Forecast</button>
-        </div>
-        <div class="farm-grid" id="farmGrid"></div>
-      </div>
-    </div>
+    <!-- ═══ LIVE DOMAIN PAGES (rendered by pages.js from live analysis) ═══ -->
+    <div class="page" id="pg-precision-farming"><div class="pg-pad"><div class="lv-host"></div></div></div>
 
-    <!-- ═══ WATER RESOURCES ═══ -->
-    <div class="page" id="pg-water-resources">
-      <div class="pg-pad">
-        <div class="stats-grid" id="waterStats"></div>
-        <div class="panel full" id="waterTable"></div>
-      </div>
-    </div>
+    <div class="page" id="pg-water-resources"><div class="pg-pad"><div class="lv-host"></div></div></div>
 
-    <!-- ═══ FOOD SECURITY ═══ -->
-    <div class="page" id="pg-food-security">
-      <div class="pg-pad">
-        <div class="stats-grid" id="foodStats"></div>
-        <div class="panel full" id="foodTable"></div>
-      </div>
-    </div>
+    <div class="page" id="pg-food-security"><div class="pg-pad"><div class="lv-host"></div></div></div>
 
-    <!-- ═══ OTHER PAGES ═══ -->
-    <div class="page" id="pg-crop-monitoring"><div class="pg-pad">
-      <div class="panel"><div class="panel-hdr"><h3>🛰️ Crop Monitoring — Sentinel-2 (2A/2B/2C) & MODIS</h3><span class="panel-badge" style="background:var(--accent-green)">Sentinel-2</span></div>
-        <div style="padding:16px;font-size:13px;line-height:1.7;color:var(--text-secondary)">
-          <p><strong>Data Sources:</strong> ESA Sentinel-2 (2A/2B/2C — 10m multispectral, 3–5 day revisit), NASA MODIS (250m–1km, daily), USGS Landsat 8/9 (30m, 16-day revisit), NISAR (200m SAR soil moisture, 12-day revisit).</p>
-          <p><strong>Current Coverage:</strong> Real-time NDVI time series across 196 monitored agricultural zones. Phenological stage tracking: Seeding → Emergence → Flowering → Grain Fill → Harvest.</p>
-          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin:16px 0">
-            <div style="background:var(--bg-deep);padding:12px;border-radius:8px;border-left:3px solid var(--accent-green)">
-              <div style="font-size:11px;color:var(--text-muted)">Sentinel-2 Revisit</div>
-              <div style="font-size:18px;font-weight:700;color:var(--accent-green)">5 days</div>
-            </div>
-            <div style="background:var(--bg-deep);padding:12px;border-radius:8px;border-left:3px solid var(--accent-blue)">
-              <div style="font-size:11px;color:var(--text-muted)">MODIS Daily Passes</div>
-              <div style="font-size:18px;font-weight:700;color:var(--accent-blue)">2/day</div>
-            </div>
-            <div style="background:var(--bg-deep);padding:12px;border-radius:8px;border-left:3px solid var(--accent-cyan)">
-              <div style="font-size:11px;color:var(--text-muted)">Landsat Resolution</div>
-              <div style="font-size:18px;font-weight:700;color:var(--accent-cyan)">30m</div>
-            </div>
-            <div style="background:var(--bg-deep);padding:12px;border-radius:8px;border-left:3px solid var(--accent-amber)">
-              <div style="font-size:11px;color:var(--text-muted)">Anomaly Detection</div>
-              <div style="font-size:18px;font-weight:700;color:var(--accent-amber)">20yr baseline</div>
-            </div>
-          </div>
-          <p><strong>Stress Diagnosis:</strong> Water stress (blue), Nutrient stress (yellow), Heat stress (red), Pest risk (orange). Crop-specific alerts: “Wheat at flowering stage, water critical for grain fill.”</p>
-          <p><strong>Copernicus Integration:</strong> Open Access Hub for Sentinel-1 SAR (soil moisture, flood mapping) and Sentinel-2 optical imagery. Free registration required.</p>
-        </div>
-      </div>
-    </div></div>
+    <div class="page" id="pg-crop-monitoring"><div class="pg-pad"><div class="lv-host"></div></div></div>
 
-    <div class="page" id="pg-soil-analysis"><div class="pg-pad">
-      <div class="panel"><div class="panel-hdr"><h3>🧪 Soil Analysis — NISAR, SMAP & Sentinel-1 SAR</h3><span class="panel-badge" style="background:var(--accent-blue)">NISAR + SMAP</span></div>
-        <div style="padding:16px;font-size:13px;line-height:1.7;color:var(--text-secondary)">
-          <p><strong>Data Sources:</strong> <strong style="color:var(--accent-green)">NISAR</strong> (200m soil moisture, L-band + S-band SAR, 12-day revisit, cloud-penetrating — <a href="https://www.earthdata.nasa.gov/data/catalog/asf-nisar-l3-sme2-beta-v1-1" target="_blank" style="color:var(--accent-blue)">NASA ASF DAAC</a>), NASA SMAP (9km global soil moisture, daily), ESA Sentinel-1 SAR (10m, 6-day revisit), GRACE-FO (300km groundwater storage, monthly).</p>
-          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin:16px 0">
-            <div style="background:var(--bg-deep);padding:12px;border-radius:8px;border-left:3px solid var(--accent-green)">
-              <div style="font-size:11px;color:var(--text-muted)">NISAR Soil Moisture</div>
-              <div style="font-size:18px;font-weight:700;color:var(--accent-green)">200m res</div>
-              <div style="font-size:10px;color:var(--accent-green)">Beta Global L3 · 12-day 🆕</div>
-            </div>
-            <div style="background:var(--bg-deep);padding:12px;border-radius:8px;border-left:3px solid var(--accent-blue)">
-              <div style="font-size:11px;color:var(--text-muted)">Surface Moisture (SMAP)</div>
-              <div style="font-size:18px;font-weight:700;color:var(--accent-blue)">45%</div>
-              <div style="font-size:10px;color:var(--accent-amber)">Approaching dry stress <em>[Illustrative]</em></div>
-            </div>
-            <div style="background:var(--bg-deep);padding:12px;border-radius:8px;border-left:3px solid var(--accent-red)">
-              <div style="font-size:11px;color:var(--text-muted)">Root Zone Status</div>
-              <div style="font-size:18px;font-weight:700;color:var(--accent-red)">Stressed</div>
-              <div style="font-size:10px;color:var(--accent-red)">7 days to permanent damage <em>[Illustrative]</em></div>
-            </div>
-            <div style="background:var(--bg-deep);padding:12px;border-radius:8px;border-left:3px solid var(--accent-amber)">
-              <div style="font-size:11px;color:var(--text-muted)">GRACE Anomaly</div>
-              <div style="font-size:18px;font-weight:700;color:var(--accent-amber)">−5.2 cm</div>
-              <div style="font-size:10px;color:var(--text-muted)">Declining 3cm/yr <em>[Illustrative]</em></div>
-            </div>
-          </div>
-          <p><strong>Irrigation Recommendation:</strong> URGENT — Begin irrigation if possible. Next window: 7 days before permanent crop damage.</p>
-          <p><strong>Copernicus Soil Moisture:</strong> Sentinel-1 C-band SAR for high-resolution soil moisture estimation. Texture classification, organic carbon estimation, and nutrient deficiency mapping.</p>
-        </div>
-      </div>
-    </div></div>
+    <div class="page" id="pg-soil-analysis"><div class="pg-pad"><div class="lv-host"></div></div></div>
 
-    <div class="page" id="pg-drought-monitor"><div class="pg-pad">
-      <div class="panel"><div class="panel-hdr"><h3>🏜️ Drought Monitor — Multi-Index Analysis</h3><span class="panel-badge crit">3 Severe Alerts</span></div>
-        <div style="padding:16px;font-size:13px;line-height:1.7;color:var(--text-secondary)">
-          <p><strong>Indices Used:</strong> Standardized Precipitation Index (SPI), Standardized Precipitation Evapotranspiration Index (SPEI), Vegetation Condition Index (VCI).</p>
-          <p><strong>Data Sources:</strong> NOAA GPM (0.1°, 30-min), CHIRPS (0.05°, daily/monthly), ERA5 Copernicus Reanalysis (0.25°, 1950–present), IRI Seasonal Forecasts.</p>
-          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin:16px 0">
-            <div style="background:var(--bg-deep);padding:12px;border-radius:8px;border-left:3px solid var(--accent-red)">
-              <div style="font-size:11px;color:var(--text-muted)">SPI (1-month)</div>
-              <div style="font-size:18px;font-weight:700;color:var(--accent-red)">−1.8</div>
-              <div style="font-size:10px">Severe Drought</div>
-            </div>
-            <div style="background:var(--bg-deep);padding:12px;border-radius:8px;border-left:3px solid var(--accent-amber)">
-              <div style="font-size:11px;color:var(--text-muted)">Rainfall Anomaly</div>
-              <div style="font-size:18px;font-weight:700;color:var(--accent-amber)">−35%</div>
-              <div style="font-size:10px">Below normal</div>
-            </div>
-            <div style="background:var(--bg-deep);padding:12px;border-radius:8px;border-left:3px solid var(--accent-red)">
-              <div style="font-size:11px;color:var(--text-muted)">30-Day Forecast</div>
-              <div style="font-size:18px;font-weight:700;color:var(--accent-red)">Below Normal</div>
-            </div>
-            <div style="background:var(--bg-deep);padding:12px;border-radius:8px;border-left:3px solid #d73027">
-              <div style="font-size:11px;color:var(--text-muted)">90-Day Outlook</div>
-              <div style="font-size:18px;font-weight:700;color:#d73027">Severe Risk</div>
-            </div>
-          </div>
-          <p><strong>Active Severe Zones:</strong> Horn of Africa (Ethiopia, Kenya, Somalia) — 20–25 million people need humanitarian food assistance. 6.5 million in Somalia in IPC Phase 3+ (Feb–Mar 2026). IPC Phase 5 (Famine) risk if March–May 2026 rains fail. Driver: historic OND 2025 dry season (worst on record), La Niña, strongly negative Indian Ocean Dipole. Rainfall deficits 30–50% of normal in worst zones. <em style="font-size:11px;color:var(--text-muted)">Source: FEWS NET, IPC, WFP — last updated 2026-04-22</em></p>
-          <p><strong>Water Balance:</strong> <em style="font-size:11px;color:var(--text-muted)">[Illustrative]</em> Supply 1,200M m³ vs Demand 1,800M m³ — Deficit risk HIGH in dry season. <em style="font-size:11px;color:var(--text-muted)">Connect to FAO AQUASTAT / WaPOR v3 for live values.</em></p>
-        </div>
-      </div>
-    </div></div>
+    <div class="page" id="pg-drought-monitor"><div class="pg-pad"><div class="lv-host"></div></div></div>
 
-    <div class="page" id="pg-early-warning"><div class="pg-pad">
-      <div class="panel"><div class="panel-hdr"><h3>⚠️ Early Warning System — 90-Day Forecast</h3><span class="panel-badge" style="background:var(--accent-amber)">Active</span></div>
-        <div style="padding:16px;font-size:13px;line-height:1.7;color:var(--text-secondary)">
-          <p><strong>Predictive Engine:</strong> Combines satellite EO (Sentinel, MODIS, SMAP), weather forecasts (NOAA CFS, IRI), commodity prices (WFP), and conflict data (ACLED) for IPC-compatible 90-day forecasts.</p>
-          <div style="background:var(--bg-deep);border-left:4px solid var(--accent-red);padding:14px;border-radius:6px;margin:16px 0">
-            <div style="font-weight:700;color:var(--accent-red);margin-bottom:6px">🚨 ALERT: Acute Water Stress — Horn of Africa</div>
-            <div style="font-size:12px;margin-bottom:8px"><strong>Cause:</strong> Historic OND 2025 dry season (worst on record) + La Niña + strongly negative Indian Ocean Dipole</div>
-            <div style="font-size:12px;margin-bottom:8px"><strong>Evidence:</strong> SPI −1.8, NDVI down 22% YoY, water table drop 35cm (GRACE-FO), NISAR soil moisture at 12% (−4% anomaly)</div>
-            <div style="font-size:12px;margin-bottom:8px"><strong>Impact (90 days):</strong> 20–25M people need humanitarian food assistance. 6.5M in Somalia in IPC Phase 3+. IPC Phase 5 (Famine) risk if MAM 2026 rains fail. Rainfall deficits 30–50% in worst zones.</div>
-            <div style="font-size:12px;margin-bottom:8px"><strong>Action:</strong> Scale up emergency water & food transfers. Pre-position supplies in pastoral zones. Deploy field teams. Prioritize sub-counties via NISAR+CHIRPS+IPC pipeline.</div>
-            <div style="font-size:10px;color:var(--text-muted);margin-top:6px">Source: FEWS NET, IPC, WFP — last updated 2026-04-22</div>
-          </div>
-          <div style="background:var(--bg-deep);border-left:4px solid var(--accent-amber);padding:14px;border-radius:6px;margin:12px 0">
-            <div style="font-weight:700;color:var(--accent-amber);margin-bottom:6px">⚠️ WATCH: Yield Loss — South Asia Wheat Belt</div>
-            <div style="font-size:12px;margin-bottom:8px"><strong>Evidence:</strong> NDVI anomaly −0.18, soil moisture below 25% (SMAP), temperature +3°C above normal</div>
-            <div style="font-size:12px"><strong>Forecast:</strong> 20–35% yield loss if current conditions persist. Shift to drought-tolerant varieties advised. Food price spike expected in 4 weeks.</div>
-          </div>
-          <p><strong>Data Sources:</strong> NOAA CFS (9-month lead), IRI Seasonal Forecasts, Copernicus ERA5 Reanalysis, WFP HungerMap Live, FEWS NET.</p>
-        </div>
-      </div>
-    </div></div>
+    <div class="page" id="pg-early-warning"><div class="pg-pad"><div class="lv-host"></div></div></div>
 
-    
     <!-- ─── ENVIRONMENTAL SITE INTELLIGENCE ─── -->
     <div class="page" id="pg-site-intelligence">
       <div class="pg-pad" style="max-width:1400px; margin:0 auto; display:flex; flex-direction:column; gap:20px; height:calc(100vh - 120px);">
@@ -800,29 +642,7 @@
           </button>
         </div>
 
-          <p><strong>Available Reports:</strong> Weekly crisis briefings, monthly trend summaries, custom region/theme reports. Formats: PDF (visual), CSV (data), GeoTIFF (spatial).</p>
-          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin:16px 0">
-            <div style="background:var(--bg-deep);padding:12px;border-radius:8px;cursor:pointer">
-              <div style="font-size:18px;margin-bottom:6px">📄</div>
-              <div style="font-weight:600;margin-bottom:4px">Weekly Food Security Brief</div>
-              <div style="font-size:11px;color:var(--text-muted)">Auto-generated from IPC + WFP + NDVI data. Last generated: Today.</div>
-            </div>
-            <div style="background:var(--bg-deep);padding:12px;border-radius:8px;cursor:pointer">
-              <div style="font-size:18px;margin-bottom:6px">📄</div>
-              <div style="font-weight:600;margin-bottom:4px">Monthly Water Resources Summary</div>
-              <div style="font-size:11px;color:var(--text-muted)">GRACE + CHIRPS + reservoir data. Covers 196 regions.</div>
-            </div>
-            <div style="background:var(--bg-deep);padding:12px;border-radius:8px;cursor:pointer">
-              <div style="font-size:18px;margin-bottom:6px">📄</div>
-              <div style="font-weight:600;margin-bottom:4px">Crop Season Outlook</div>
-              <div style="font-size:11px;color:var(--text-muted)">Yield forecasts vs 5-year average from Sentinel-2 + weather models.</div>
-            </div>
-            <div style="background:var(--bg-deep);padding:12px;border-radius:8px;cursor:pointer">
-              <div style="font-size:18px;margin-bottom:6px">📄</div>
-              <div style="font-weight:600;margin-bottom:4px">Drought Early Warning</div>
-              <div style="font-size:11px;color:var(--text-muted)">SPI/SPEI/VCI indices. 90-day regional forecasts with confidence scores.</div>
-            </div>
-          </div>
+          <p>Reports combine the latest live site analysis (crops, water quantity and quality, soil, food security, hazards) with an AI summary and a forecast trained on the site’s real Sentinel-2 history. Analyse a farm or region first, then generate.</p>
         </div>
       </div>
 
@@ -836,11 +656,6 @@
           <div style="display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-bottom:14px;">
             <label style="font-size:12px; font-weight:600; color:var(--text-secondary);">Region:</label>
             <select id="fcRegion" class="emhare-select" style="max-width:240px; padding:8px 10px;">
-              <option value="Sahel">Sahel Belt</option>
-              <option value="Horn of Africa">Horn of Africa</option>
-              <option value="East Africa">East Africa Highlands</option>
-              <option value="Southern Africa">Southern Africa</option>
-              <option value="West Africa">West Africa Coast</option>
             </select>
             <button id="btnRunForecast" class="fc-run-btn">▶ Run LSTM Forecast</button>
             <span id="fcStatus" style="font-size:12px; color:var(--text-muted);"></span>
@@ -850,7 +665,7 @@
           </div>
           <div id="fcComparison" style="display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; margin-top:16px;"></div>
           <p style="font-size:11px; color:var(--text-muted); margin-top:12px;">
-            History blends live regional NDVI with a 24-month seasonal model. The forecast is produced client-side by a small LSTM neural network (TensorFlow.js); a statistical trend model is used as fallback if the network is unavailable.
+            History is the real monthly Sentinel-2 NDVI of your analysed area (24 months). The forecast is produced in your browser by a small LSTM neural network (TensorFlow.js), with a statistical trend model as fallback.
           </p>
         </div>
       </div>
@@ -924,118 +739,11 @@
 </div>
 
 <!-- ═══════════════ WATER ANALYTICS MODAL ═══════════════ -->
-<div class="modal-overlay" id="waterAnalyticsModal" style="display:none; align-items:center;">
-  <div class="wb-modal" style="width: 1000px; max-width: 95%; max-height: 90vh; overflow-y: auto; overflow-x: hidden; background: #ffffff; padding: 24px; border-radius: 4px; box-shadow: 0 10px 40px rgba(0,0,0,0.2);">
-    <!-- Modal Header -->
-    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--accent-blue); padding-bottom: 12px; margin-bottom: 20px;">
-      <div style="display: flex; align-items: center; gap: 12px;">
-        <div style="background:var(--accent-blue); color:#fff; width:36px; height:36px; border-radius:50%; display:flex; justify-content:center; align-items:center; font-size:18px;">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12c-4 0-4-4-10-4S2 12 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2z"></path><path d="M12 12v6"></path><path d="M16 12v5"></path><path d="M8 12v5"></path></svg>
-        </div>
-        <h2 id="wbModalTitle" style="margin:0; font-size:28px; color:#000; font-family:'Segoe UI', sans-serif;">Lake Victoria (Murray)</h2>
-      </div>
-      <button onclick="closeWaterAnalytics()" style="background:none; border:none; font-size:24px; cursor:pointer; color:var(--text-muted);">&times;</button>
-    </div>
 
-    <!-- KPI Dashboard Row -->
-    <div class="wb-kpi-row" style="display: flex; gap: 4px; margin-bottom: 24px; align-items: stretch; height: 70px;">
-      
-      <!-- Reservoir Level -->
-      <div style="flex:1.2; display:flex; flex-direction:row; color:#fff; align-items:center;">
-        <div style="background:#005c99; width:30px; height:100%; display:flex; justify-content:center; align-items:center; border-right:1px solid #fff;">
-          <svg style="width:16px; height:30px;" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2v20l2-2 2 2 2-2 2 2 2-2 2 2 2-2 2 2V2"/><path d="M4 14h16"/><path d="M4 18h16"/><path d="M4 10h16"/><path d="M4 6h16"/></svg>
-        </div>
-        <div style="background:#e6e1d8; color:#000; flex:1; height:100%; padding:8px 12px; display:flex; flex-direction:column; justify-content:center;">
-          <div style="font-size:12px; color:#333;">Reservoir level</div>
-          <div style="margin-top:-2px;"><span id="wbKpiLevel" style="font-size:22px; font-weight:700;">23.53</span><span style="font-size:12px;font-weight:600;"> m</span></div>
-          <div id="wbKpiLevelDate" style="font-size:10px; color:#666; margin-top:2px;">22/04/2026 07:00</div>
-        </div>
-      </div>
 
-      <!-- Volume -->
-      <div style="flex:1.2; display:flex; flex-direction:row; color:#000; align-items:center;">
-        <div style="background:#e6e1d8; width:70px; height:100%; display:flex; justify-content:center; align-items:center; border-right:2px solid #fff;">
-           <div style="position:relative; width:46px; height:46px;">
-             <!-- Simplified CSS donut -->
-             <svg viewBox="0 0 36 36" style="width:46px; height:46px; border-radius:50%; background:#d2ccc1;">
-                <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="#005c99" stroke-width="4" stroke-dasharray="44, 100" id="wbKpiVolChart" />
-             </svg>
-             <div id="wbKpiVolPerc" style="position:absolute; top:0; left:0; width:100%; height:100%; display:flex; justify-content:center; align-items:center; font-size:12px; font-weight:700; color:#333;">44%</div>
-           </div>
-        </div>
-        <div style="background:#e6e1d8; flex:1; height:100%; padding:8px 12px; display:flex; flex-direction:column; justify-content:center;">
-          <div style="font-size:12px; color:#333;">Volume</div>
-          <div style="margin-top:-2px;"><span id="wbKpiVolData" style="font-size:18px; font-weight:700;">297 GL</span></div>
-          <div id="wbKpiVolDate" style="font-size:10px; color:#666; margin-top:4px;">22/04/2026 07:00</div>
-        </div>
-      </div>
-
-      <!-- Water Temp -->
-      <div style="flex:1; display:flex; flex-direction:row; background:#e6e1d8; color:#000; align-items:center;">
-        <div style="width:40px; height:100%; display:flex; justify-content:center; align-items:center;">
-          <div style="background:#e48b81; width:26px; height:26px; border-radius:50%; display:flex; justify-content:center; align-items:center; color:#fff;">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z"></path></svg>
-          </div>
-        </div>
-        <div style="flex:1; height:100%; padding:8px 0; display:flex; flex-direction:column; justify-content:center;">
-          <div style="font-size:12px; color:#333;">Water temp</div>
-          <div style="margin-top:-2px;"><span id="wbKpiTemp" style="font-size:18px; font-weight:700;">17.2°C</span></div>
-          <div id="wbKpiTempDate" style="font-size:10px; color:#666; margin-top:4px;">22/04/2026 07:00</div>
-        </div>
-      </div>
-
-      <!-- Salinity -->
-      <div style="flex:1; display:flex; flex-direction:row; background:#e6e1d8; color:#000; align-items:center; border-left:4px solid #fff;">
-        <div style="width:40px; height:100%; display:flex; justify-content:center; align-items:center;">
-          <div style="background:#b781e4; width:26px; height:26px; border-radius:50%; display:flex; justify-content:center; align-items:center; color:#fff;">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 13h18"></path><path d="M3 17h18"></path><path d="M3 21h18"></path><path d="M3 9h18"></path><path d="M3 5h18"></path></svg>
-          </div>
-        </div>
-        <div style="flex:1; height:100%; padding:8px 0; display:flex; flex-direction:column; justify-content:center;">
-          <div style="font-size:12px; color:#333;">Salinity</div>
-          <div style="margin-top:-2px;"><span id="wbKpiSalinity" style="font-size:18px; font-weight:700;">297.3</span><span style="font-size:11px;font-weight:600;"> µS/cm</span></div>
-          <div id="wbKpiSalDate" style="font-size:10px; color:#666; margin-top:4px;">22/04/2026 07:00</div>
-        </div>
-      </div>
-
-      <!-- Forecast -->
-      <div style="flex:1; display:flex; flex-direction:row; background:#e6e1d8; color:#000; align-items:center; border-left:4px solid #fff;">
-        <div style="width:40px; height:100%; display:flex; justify-content:center; align-items:center;">
-          <div style="background:#5e666a; width:26px; height:26px; border-radius:50%; display:flex; justify-content:center; align-items:center; color:#fff;">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
-          </div>
-        </div>
-        <div style="flex:1; height:100%; padding:8px 0; display:flex; flex-direction:column; justify-content:center;">
-          <div style="font-size:12px; color:#333; margin-top:14px;">Volume Forecast</div>
-        </div>
-      </div>
-    </div>
-    
-    <div style="background:#005c99; width:100%; height:8px; margin-bottom:12px;"></div>
-
-    <!-- Date Filters -->
-    <div style="display:flex; justify-content:flex-end; gap:12px; margin-bottom:16px;">
-       <div style="display:flex; align-items:center; gap:6px;">
-         <label for="wbStartDate" style="font-size:12px; font-weight:600;">Start:</label>
-         <input type="date" id="wbStartDate" class="wb-date-input">
-       </div>
-       <div style="display:flex; align-items:center; gap:6px;">
-         <label for="wbEndDate" style="font-size:12px; font-weight:600;">End:</label>
-         <input type="date" id="wbEndDate" class="wb-date-input">
-       </div>
-       <button class="wb-apply-btn" onclick="applyWaterAnalyticsDates()">Apply</button>
-    </div>
-
-    <!-- Chart -->
-    <div style="height: 400px; width: 100%; position:relative;">
-      <canvas id="waterBodyChartCanvas"></canvas>
-    </div>
-
-  </div>
-</div>
-
-<script src="app.js?v=21"></script>
-<script src="eo.js?v=4"></script>
+<script src="app.js?v=22"></script>
+<script src="eo.js?v=5"></script>
+<script src="pages.js?v=1"></script>
 <script src="https://cdn.jsdelivr.net/npm/lenis@1.1.13/dist/lenis.min.js"></script>
 <script src="landing.js?v=2"></script>
 </body>

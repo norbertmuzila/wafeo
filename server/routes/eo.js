@@ -44,4 +44,16 @@ router.post('/eo/ndvi-series', limiter, async (req, res) => {
   }
 });
 
+// Live GDACS hazards worldwide (dashboard map), refreshed every 15 minutes.
+const { gdacsEvents } = require('../services/eo/live');
+router.get('/live/hazards', async (req, res) => {
+  try {
+    const events = await gdacsEvents();
+    res.json({ source: 'GDACS (UN / European Commission)', checkedAt: new Date().toISOString(), events });
+  } catch (err) {
+    console.error('[live] GDACS failed:', err.message);
+    res.status(502).json({ error: 'Live hazard feed is temporarily unavailable.' });
+  }
+});
+
 module.exports = router;

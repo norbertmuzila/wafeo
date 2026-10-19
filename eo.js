@@ -217,11 +217,8 @@
     if (overlayText) overlayText.textContent = STEPS[step++];
 
     try {
-      const res = await fetch(API + '/eo/analyze', { method: 'POST', headers: authHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify(body), signal: AbortSignal.timeout(90000) });
-      if (res.status === 401 && typeof handleExpiredSession === 'function') return handleExpiredSession();
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || 'Analysis failed.');
-      setLast(data);
+      const data = await analyzeArea(body);
+      if (!data) return;
       showResultAoi(data.aoi.geometry);
       renderSite(data);
       hint(`Analysed ${data.aoi.areaHa.toLocaleString()} ha. Results are also on the Crop, Soil, Water and Drought pages and in Reports.`);
@@ -236,11 +233,33 @@
     }
   }
 
+  // Run an analysis for { point, radius_m } or { geometry } from any page.
+  async function analyzeArea(body) {
+    const res = await fetch(API + '/eo/analyze', { method: 'POST', headers: authHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify(body), signal: AbortSignal.timeout(90000) });
+    if (res.status === 401 && typeof handleExpiredSession === 'function') { handleExpiredSession(); return null; }
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Analysis failed.');
+    setLast(data);
+    return data;
+  }
+
+  async function geocode(query) {
+    const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=1`);
+    const g = await res.json();
+    if (!g.length) throw new Error(`"${query}" was not found. Try a nearby town, or coordinates like -17.85, 31.35.`);
+    return { lat: parseFloat(g[0].lat), lon: parseFloat(g[0].lon), label: g[0].display_name };
+  }
+
   function setLast(data) {
     state.last = data;
     try { localStorage.setItem(STORE_KEY, JSON.stringify(data)); } catch (e) { /* storage full or blocked */ }
     document.dispatchEvent(new CustomEvent('wafeo:analysis', { detail: data }));
-    renderAllContexts();
+  }
+
+  function openSiteIntelligence() {
+    const link = document.querySelector('.nav-link[data-page="site-intelligence"]');
+    if (link) link.click();
+    setTimeout(() => { buildToolbar(); if (state.last) { showResultAoi(state.last.aoi.geometry); renderSite(state.last); } }, 350);
   }
 
   // ─── Rendering: Site Intelligence tabs ────────────────────
@@ -321,53 +340,8 @@
       </div>`).join('');
   }
 
-  // ─── Live context on the domain pages ─────────────────────
-  const PAGE_CONTEXT = {
-    'crop-monitoring': { title: 'Crop condition', domains: ['crop'] },
-    'precision-farming': { title: 'Field condition', domains: ['crop', 'soil'] },
-    'soil-analysis': { title: 'Soil and soil water', domains: ['soil'], extra: a => metricTable('Soil moisture & water', { metrics: pick(a.domains.waterQuantity.metrics, ['smapSoilMoisture', 'smapSoilMoisture7d', 'soilMoisture', 'rootZoneAvailableWaterPct']) }) },
-    'water-resources': { title: 'Water quantity and quality', domains: ['waterQuantity', 'waterQuality'] },
-    'drought-monitor': { title: 'Drought signals', domains: ['waterQuantity'], extra: a => metricTable('Vegetation response', { metrics: pick(a.domains.crop.metrics, ['ndvi', 'ndviAnomaly', 'ndmi', 'evaporativeStressIndex', 'landSurfaceTempC']) }) + metricTable('Groundwater and reservoirs', { metrics: pick(a.domains.waterQuantity.metrics, ['groundwaterAnomalyCm', 'groundwaterTrendCmYr', 'groundwaterPercentile', 'groundwaterMonth', 'reservoirs']) }) },
-    'early-warning': { title: 'Early warnings for this area', domains: [], extra: a => issuesShort(a) + `<h4 class="eo-h4">Top actions</h4>` + topActions(a) },
-    'food-security': { title: 'Food-security outlook for this area', domains: ['crop', 'waterQuantity'], extra: a => issuesShort(a) }
-  };
-  const pick = (o, keys) => Object.fromEntries(keys.filter(k => o && o[k] !== undefined && o[k] !== null).map(k => [k, o[k]]));
-  const issuesShort = a => a.issues.length ? `<ul class="eo-issue-list">${a.issues.slice(0, 6).map(i => `<li><span class="si-badge ${sevClass(i.severity)}">${esc(i.severity)}</span> <b>${esc(i.title)}</b> — ${esc(i.detail)}</li>`).join('')}</ul>` : '<p class="si-card-desc">No warning signs detected.</p>';
-  const topActions = a => `<ol class="eo-actions">${['farmers', 'government', 'public'].map(w => a.recommendations[w][0]).filter(Boolean).map((r, i) => `<li><div class="eo-action"><b>${['Farmers', 'Government', 'Public'][i]}:</b> ${esc(r.action)}</div></li>`).join('')}</ol>`;
-
-  function renderContext(pageId) {
-    const conf = PAGE_CONTEXT[pageId];
-    const page = document.getElementById('pg-' + pageId);
-    if (!conf || !page) return;
-    const host = page.querySelector('.pg-pad') || page;
-    let box = host.querySelector(':scope > .eo-context');
-    if (!box) { box = document.createElement('div'); box.className = 'eo-context panel'; host.insertBefore(box, host.firstChild); }
-    const a = state.last;
-    if (!a) {
-      box.innerHTML = `<div class="eo-context-empty">📡 <b>Live satellite readings</b> — select a farm or region in <a href="#" data-eo-open>Site Intelligence</a> to see real Sentinel-2, Landsat, soil and rainfall data for it here.</div>`;
-    } else {
-      const p = a.data.place || {};
-      const when = new Date(a.generatedAt).toLocaleString();
-      box.innerHTML = `
-        <div class="eo-context-hdr">
-          <div><b>📡 ${esc(conf.title)}</b> · ${esc([p.name, p.country].filter(Boolean).join(', '))} · ${a.aoi.areaHa.toLocaleString()} ha</div>
-          <div class="eo-context-meta">Analysed ${esc(when)} · <a href="#" data-eo-open>Open full analysis</a></div>
-        </div>
-        <div class="eo-context-cards">${conf.domains.map(k => domainCard(a.domains[k], DOMAINS.find(d => d[0] === k)[1], DOMAINS.find(d => d[0] === k)[2], KEY_METRICS[k])).join('')}</div>
-        ${conf.extra ? conf.extra(a) : ''}`;
-    }
-    box.querySelectorAll('[data-eo-open]').forEach(l => l.addEventListener('click', e => {
-      e.preventDefault();
-      const link = document.querySelector('.nav-link[data-page="site-intelligence"]');
-      if (link) link.click();
-      setTimeout(() => { buildToolbar(); if (state.last) { showResultAoi(state.last.aoi.geometry); renderSite(state.last); } }, 350);
-    }));
-  }
-  function renderAllContexts() { Object.keys(PAGE_CONTEXT).forEach(renderContext); }
-
   document.querySelectorAll('.nav-link').forEach(link => link.addEventListener('click', () => {
     const pg = link.dataset.page;
-    if (PAGE_CONTEXT[pg]) setTimeout(() => renderContext(pg), 50);
     if (pg === 'site-intelligence') setTimeout(() => {
       buildToolbar();
       if (state.last && !document.getElementById('siMetricsGrid').children.length) { showResultAoi(state.last.aoi.geometry); renderSite(state.last); }
@@ -440,9 +414,7 @@
   }
   const siteName = () => { const p = state.last && state.last.data.place; return p ? [p.name, p.country].filter(Boolean).join(', ') : null; };
 
-  window.wafeoSite = { analyze, run, last: () => state.last, siteName, ndviSeries, reportHtml, reportPromptContext, reportData };
+  window.wafeoSite = { analyze, run, analyzeArea, geocode, openSiteIntelligence, last: () => state.last, siteName, ndviSeries, reportHtml, reportPromptContext, reportData, labels: METRIC_LABELS, metricValue, sevClass, statusClass };
 
   // Draw saved results once the app is ready.
-  document.addEventListener('wafeo:auth', () => setTimeout(renderAllContexts, 300));
-  if (state.last) setTimeout(renderAllContexts, 1000);
 })();

@@ -12,6 +12,7 @@ const where = require('./place');
 const nasa = require('./earthdata');
 const isda = require('./isda');
 const { swotLakes } = require('./swot');
+const live = require('./live');
 
 const CACHE_TTL = 3 * 60 * 60 * 1000;
 const cache = new Map();
@@ -62,7 +63,10 @@ async function analyzeSite(body) {
   const hasWater = (gsw.value?.maxExtentHa || 0) >= 1 || (s2Now.value?.water?.areaHa || 0) >= 1;
   const swotR = hasWater ? await settle('SWOT', 40000, () => swotLakes(aoi, now)) : { ok: false, value: { available: false, reason: 'No lake or reservoir in this area.' } };
   const pl = placeR.value || {};
-  const fsR = await settle('Food security', 5000, () => where.foodSecurity(pl.country));
+  const [fsR, hzR] = await Promise.all([
+    settle('FEWS NET food security', 35000, () => live.foodSecurity(pl, now)),
+    settle('GDACS hazards', 20000, () => live.hazardsNear(c, pl.country, now))
+  ]);
 
   const data = {
     place: pl,
@@ -77,6 +81,7 @@ async function analyzeSite(body) {
     rainfall: rain.value || null,
     river: river.value || null,
     foodSecurity: fsR.value || null,
+    hazards: hzR.value || null,
     ecostress: ecoR.value || null,
     smap: smapR.value || null,
     grace: graceR.value || null,
@@ -96,14 +101,14 @@ async function analyzeSite(body) {
     src('Open-Meteo forecast', 'Open-Meteo (ECMWF, DWD and others)', 'Weather, 16-day forecast, evapotranspiration (ET₀), modelled soil moisture', wx, () => 'hourly · ~10 km'),
     src('ERA5 reanalysis', 'ECMWF Copernicus via Open-Meteo', 'Rainfall anomaly vs 25-year baseline (SPI-style)', rain, () => 'daily · ~25 km'),
     src('GloFAS river discharge', 'Copernicus Emergency Management via Open-Meteo', 'River flow vs long-term median, 14-day flow forecast', river, () => 'daily · ~5 km'),
-    src('IPC food security', 'IPC / FEWS NET (WAFEO dataset)', 'National food-insecurity phase', fsR, v => v.phase),
+    src('FEWS NET food security', 'FEWS NET Data Warehouse (USAID)', 'Current and projected IPC-compatible food insecurity for the district; people in Phase 3+ nationally', fsR, v => `${v.unitLevel}: ${v.unitName}`),
+    src('GDACS hazard alerts', 'UN / European Commission', 'Live droughts, floods, cyclones, volcanoes and wildfires within 600 km', hzR, v => `${v.events.length} event(s) nearby`),
     src('ECOSTRESS', 'NASA JPL via LP DAAC', 'Evaporative stress index and daily evapotranspiration (crop water stress)', ecoR, v => `${v.date} · 70 m · ${v.clearPct}% clear`),
     src('SMAP L3 enhanced', 'NASA via NSIDC', 'Satellite surface soil moisture', smapR, v => `${v.latest.date} · 9 km · ${v.observations} passes in 12 days`),
     src('GRACE / GRACE-FO', 'NASA JPL / GFZ via PO.DAAC', 'Groundwater and total water storage anomaly and trend', graceR, v => `latest ${v.latest.month} · regional (~300 km)`),
     src('SWOT', 'NASA / CNES via PO.DAAC and Hydrocron', 'Lake and reservoir water level and area', swotR, v => `pass ${v.pass} · ${v.lakes.length} lake(s)`),
     src('iSDAsoil', 'iSDA Africa', 'Soil nutrients (N, P, K, Ca, Mg, Zn), pH, carbon, texture at 30 m', isdaR, () => '30 m · 0–20 and 20–50 cm'),
-    NISAR
-  ];
+  ].filter(x => x.status !== 'not connected');
 
   const analysis = interpret(data);
   const result = {
@@ -125,9 +130,6 @@ function src(name, provider, measures, r, detail) {
   return { name, provider, measures, status, detail: info };
 }
 
-// NISAR soil moisture exists over Africa only as ~130 MB HDF5 files with no
-// area-subsetting service, which is too heavy to fetch per request.
-const NISAR = { name: 'NISAR', provider: 'NASA / ISRO via ASF', measures: 'L-band radar soil moisture (200 m)', status: 'not connected', detail: 'Provisional data exists, but only as ~130 MB files with no way to request one area; will be added when NASA/ASF offer subsetting.' };
 
 // ═════════════════════════════════════════════════════════════
 //  Interpretation
@@ -330,8 +332,31 @@ function interpret(d) {
   // ─── Food security context ───
   if (d.foodSecurity?.available) {
     const f = d.foodSecurity;
-    const ph = parseInt(String(f.phase).replace(/\D/g, ''), 10);
-    if (ph >= 3) add('food', ph >= 4 ? 'critical' : 'high', `${f.country}: IPC ${f.phase} (${f.label})`, `${f.popAffected} people affected. Main drivers: ${f.driver}. Harvest outlook: ${f.harvest}.`, f.source);
+    const phases = [f.current, f.nearTerm, f.mediumTerm].filter(Boolean);
+    const worst = phases.reduce((m, p) => Math.max(m, p.phase), 0);
+    const people = n => (n && n.low !== null ? `${(n.low / 1e6).toFixed(1)}–${((n.high ?? n.low) / 1e6).toFixed(1)} million` : null);
+    const nat = people(f.nationalPhase3Plus), natP = people(f.nationalPhase3PlusProjected);
+    const parts = [
+      f.current && `latest assessment Phase ${f.current.phase} (${f.current.label}, ${f.current.period})`,
+      f.nearTerm && `near-term projection Phase ${f.nearTerm.phase} (${f.nearTerm.label}, ${f.nearTerm.period})`,
+      f.mediumTerm && `medium-term projection Phase ${f.mediumTerm.phase} (${f.mediumTerm.label}, ${f.mediumTerm.period})`
+    ].filter(Boolean);
+    domains.foodSecurity = {
+      score: null,
+      status: worst ? `IPC Phase ${worst}` : 'No data',
+      metrics: { area: `${f.unitName} (${f.unitLevel})`, currentPhase: f.current ? `${f.current.phase} – ${f.current.label}` : null, nearTermPhase: f.nearTerm ? `${f.nearTerm.phase} – ${f.nearTerm.label}` : null, mediumTermPhase: f.mediumTerm ? `${f.mediumTerm.phase} – ${f.mediumTerm.label}` : null, nationalPhase3Plus: nat, nationalPhase3PlusProjected: natP },
+      summary: `${f.unitName}: ${parts.join('; ')}.${nat ? ` Nationally ${nat} people are in Phase 3 or worse${natP ? `, projected ${natP} at the peak` : ''}.` : ''}`
+    };
+    if (worst >= 3) add('food', worst >= 4 ? 'critical' : 'high', `${f.unitName}: food insecurity at IPC Phase ${worst} (${live.phaseLabel(worst)})`, domains.foodSecurity.summary, 'FEWS NET');
+    else if (nat && f.nationalPhase3Plus.low >= 1e6) add('food', 'medium', `${f.country}: ${nat} people in food crisis nationally`, domains.foodSecurity.summary, 'FEWS NET');
+  } else {
+    domains.foodSecurity = { score: null, status: 'No data', metrics: {}, summary: d.foodSecurity?.reason || 'FEWS NET food-security data unavailable for this area.' };
+  }
+  if (d.hazards?.available) {
+    for (const e of d.hazards.events.slice(0, 6)) {
+      const sev = e.alert === 'red' ? 'critical' : e.alert === 'orange' ? 'high' : e.distanceKm <= 150 ? 'low' : null;
+      if (sev) add('hazard', sev, `${e.type} alert (${e.alert}) ${e.distanceKm} km away`, `${e.name || e.type} in ${e.country}${e.severity ? ': ' + e.severity : ''}. Active ${String(e.from).slice(0, 10)} to ${String(e.to).slice(0, 10)}.`, 'GDACS');
+    }
   }
 
   issues.sort((a, b) => SEV[b.severity] - SEV[a.severity]);
@@ -455,6 +480,11 @@ function recommend(issues, domains, d, drySeason) {
     push('government', quality.severity, 'Sample this water body (turbidity, nutrients, E. coli, heavy metals) and trace upstream pollution from mining, sewage or fertiliser.', quality.detail);
     push('farmers', quality.severity, 'Do not use this water for drinking or for vegetables eaten raw without treatment; filter and let sediment settle before irrigation.', quality.detail);
     push('public', quality.severity, 'Treat or boil water from this source before drinking.', quality.detail);
+  }
+  const hazard = has(i => i.domain === 'hazard' && ['critical', 'high'].includes(i.severity));
+  if (hazard) {
+    push('government', hazard.severity, 'Activate the disaster-response plan for the alerted hazard and coordinate with the civil protection unit.', hazard.detail);
+    push('public', hazard.severity, 'Follow official warnings for the alerted hazard and prepare to move people, livestock and stored food if told to.', hazard.detail);
   }
   const food = has(i => i.domain === 'food');
   if (food) {
