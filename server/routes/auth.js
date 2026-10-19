@@ -23,10 +23,10 @@ router.post('/login', authLimiter, async (req, res) => {
   const check = verifyPassword(String(password), user && user.password);
   if (!check.ok) return res.status(401).json({ error: 'Invalid username or password' });
 
-  if (check.needsUpgrade) {
-    store.updateUser(user.id, { password: hashPassword(String(password)) })
-      .catch(err => console.warn('[auth] Password hash upgrade failed:', err.message));
-  }
+  const changes = { lastLoginAt: new Date().toISOString() };
+  if (check.needsUpgrade) changes.password = hashPassword(String(password));
+  store.updateUser(user.id, changes)
+    .catch(err => console.warn('[auth] Post-login update failed:', err.message));
   res.json(session(user));
 });
 
@@ -47,6 +47,8 @@ router.post('/google', authLimiter, async (req, res) => {
   if (!payload || !payload.email) return res.status(401).json({ error: 'Invalid Google token' });
   if (!payload.email_verified) return res.status(403).json({ error: 'Your Google email is not verified yet.' });
 
+  const isAdminEmail = config.adminEmails.includes(payload.email.toLowerCase());
+  const now = new Date().toISOString();
   try {
     let user = await store.findUserByEmail(payload.email);
     if (!user) {
@@ -54,17 +56,20 @@ router.post('/google', authLimiter, async (req, res) => {
         username: await uniqueUsername(payload.email.split('@')[0]),
         email: payload.email,
         name: payload.name || payload.email.split('@')[0],
-        role: config.adminEmails.includes(payload.email.toLowerCase()) ? 'admin' : config.defaultRole,
+        role: isAdminEmail ? 'admin' : config.defaultRole,
         password: '',
         googleId: payload.sub,
         picture: payload.picture || '',
         authProvider: 'google',
-        region: 'Global'
+        region: 'Global',
+        lastLoginAt: now
       });
       console.log('[auth] New Google user:', user.email);
-    } else if (!user.googleId || user.picture !== payload.picture) {
-      // Link an existing email/password account to Google on first Google sign-in.
-      const changes = { googleId: payload.sub, picture: payload.picture || user.picture || '' };
+    } else {
+      // Link an existing account to Google, keep the photo fresh, record the
+      // sign-in, and promote listed admin emails even if they signed up earlier.
+      const changes = { googleId: payload.sub, picture: payload.picture || user.picture || '', lastLoginAt: now };
+      if (isAdminEmail && user.role !== 'admin') changes.role = 'admin';
       await store.updateUser(user.id, changes);
       user = { ...user, ...changes };
     }

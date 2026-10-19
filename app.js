@@ -1288,7 +1288,7 @@ async function loadAdminUsers() {
       return;
     }
     const data = await res.json();
-    const users = data.users || [];
+    const users = (data.users || []).slice().sort((a, b) => String(b.registeredAt || '').localeCompare(String(a.registeredAt || '')));
 
     panel.style.display = 'block';
     if (badge) badge.textContent = `${users.length} Users`;
@@ -1311,6 +1311,7 @@ async function loadAdminUsers() {
           <div class="upc-meta">
             <span>📍 ${escapeHtml(u.region || 'Global')}</span>
             <span>📅 ${registeredAt}</span>
+            <span>🕒 ${u.lastLoginAt ? 'Last sign-in ' + new Date(u.lastLoginAt).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'Never signed in'}</span>
           </div>
         </div>
         ${String(u.id) === String(currentUser && currentUser.id)

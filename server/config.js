@@ -47,7 +47,6 @@ const googleClientIds = (process.env.GOOGLE_CLIENT_ID || '681642080635-fpqmjobr8
 
 const corsOrigins = [
   'https://norbertmuzila.github.io',
-  'https://wafeo.vercel.app',
   'https://wafeo-webapplication.vercel.app',
   'http://localhost:3000',
   'http://localhost:5500',

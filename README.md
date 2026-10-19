@@ -52,7 +52,7 @@ Demo accounts (password `wafeo2024`): `admin`, `farmer`, `policy`, `researcher`.
 | `JWT_SECRET` | **Production** | Signs session tokens. Any long random string. Without it (and without Firebase), the production API refuses to run. |
 | `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY` | Production | Firestore storage for users, reports and activity. Without them, new accounts are not saved on Vercel. |
 | `GOOGLE_CLIENT_ID` | Optional | OAuth client ID(s), comma-separated. Defaults to the WAFEO client. |
-| `ADMIN_EMAILS` | Optional | Comma-separated Google emails that become admin on first sign-in. |
+| `ADMIN_EMAILS` | Optional | Comma-separated Google emails that are made admin whenever they sign in with Google. |
 | `DEFAULT_ROLE` | Optional | Role for new sign-ups (default `researcher`). |
 | `GROQ_API_KEY`, `GROQ_MODEL` | Optional | Enables the AI assistant (free key at console.groq.com). |
 | `CORS_ORIGINS` | Optional | Extra origins allowed to call the API. |

@@ -50,6 +50,13 @@ test('login: correct, wrong password, by email', async () => {
   assert.ok(!('password' in ((await call('POST', '/api/auth/login', { body: { username: 'farmer', password: 'wafeo2024' } })).json.user)));
 });
 
+test('login records the last sign-in time', async () => {
+  await login('researcher');
+  await new Promise(r => setTimeout(r, 50));
+  const u = JSON.parse(fs.readFileSync(tmpUsers, 'utf8')).find(x => x.username === 'researcher');
+  assert.ok(u.lastLoginAt && Date.now() - Date.parse(u.lastLoginAt) < 60000);
+});
+
 test('legacy SHA-256 hashes are upgraded to scrypt on login', async () => {
   await login('policy');
   await new Promise(r => setTimeout(r, 50));
