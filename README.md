@@ -62,6 +62,8 @@ Demo accounts (password `wafeo2024`): `admin`, `farmer`, `policy`, `researcher`.
 | `GOOGLE_CLIENT_ID` | Optional | OAuth client ID(s), comma-separated. Defaults to the WAFEO client. |
 | `ADMIN_EMAILS` | Optional | Comma-separated Google emails that are made admin whenever they sign in with Google. |
 | `DEFAULT_ROLE` | Optional | Role for new sign-ups (default `researcher`). |
+| `EARTHDATA_TOKEN` | Optional | NASA Earthdata token (urs.earthdata.nasa.gov → Generate Token). Enables ECOSTRESS, SMAP, GRACE-FO and SWOT. |
+| `ISDA_USERNAME`, `ISDA_PASSWORD` | Optional | iSDAsoil API account. Enables 30 m soil nutrients. |
 | `GROQ_API_KEY`, `GROQ_MODEL` | Optional | Enables the AI assistant (free key at console.groq.com). |
 | `CORS_ORIGINS` | Optional | Extra origins allowed to call the API. |
 | `JWT_EXPIRES_IN` | Optional | Session length (default `7d`). |
@@ -112,8 +114,12 @@ In **Site Intelligence**, choose a point and radius or draw a farm boundary and 
 | JRC Global Surface Water | Historical water extent (1984–2021) | Planetary Computer, keyless |
 | ISRIC SoilGrids 2.0 | Soil type, texture, pH, carbon, nitrogen, CEC, plant-available water | ISRIC WCS, keyless |
 | Open-Meteo / ERA5 / GloFAS | Weather, 16-day forecast, ET₀, soil moisture, 25-year rainfall anomaly, river flow | Open-Meteo, keyless |
-| SMAP, GRACE-FO, SWOT, ECOSTRESS, NISAR | Satellite soil moisture, groundwater, reservoir volume, evaporative stress | Not connected yet: need a NASA Earthdata token |
-| iSDAsoil | 30 m African soil nutrients | Not connected yet: needs an iSDA account |
+| ECOSTRESS (NASA JPL) | Evaporative stress index + daily ET at 70 m (crop water stress 1–2 weeks early) | LP DAAC COGs, needs `EARTHDATA_TOKEN` |
+| SMAP L3 enhanced (NASA) | Satellite surface soil moisture, 9 km, latest + 7-day mean | NSIDC OPeNDAP (one grid cell), needs `EARTHDATA_TOKEN` |
+| GRACE / GRACE-FO (NASA/GFZ) | Groundwater / total water storage anomaly, 5-year trend, percentile since 2002 | PO.DAAC OPeNDAP (one cell), needs `EARTHDATA_TOKEN` |
+| SWOT (NASA/CNES) | Lake and reservoir water level and area, 30-day and 1-year change | PO.DAAC LakeSP + Hydrocron, needs `EARTHDATA_TOKEN`; only runs when the area holds water |
+| iSDAsoil (iSDA Africa) | 30 m soil N, P, K, Zn, pH, carbon, texture | iSDA API, needs `ISDA_USERNAME` / `ISDA_PASSWORD` |
+| NISAR (NASA/ISRO) | 200 m radar soil moisture | Not connected: provisional data is only offered as ~130 MB files with no per-area access |
 
 Results appear on the Crop, Precision Farming, Soil, Water, Drought, Early Warning and Food Security pages, and the report generator includes the full assessment, priority findings, actions per audience, sources, and an LSTM forecast trained on the site's real Sentinel-2 NDVI.
 

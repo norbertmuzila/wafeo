@@ -38,18 +38,18 @@ function makeGrid(aoi, epsg, nativeRes) {
 }
 
 const tiffCache = new Map();
-function openTiff(href) {
+function openTiff(href, headers) {
   const key = href.split('?')[0];
   if (!tiffCache.has(key)) {
-    tiffCache.set(key, geotiff().then(g => g.fromUrl(href, { allowFullFile: false })).catch(err => { tiffCache.delete(key); throw err; }));
+    tiffCache.set(key, geotiff().then(g => g.fromUrl(href, { allowFullFile: false, ...(headers ? { headers } : {}) })).catch(err => { tiffCache.delete(key); throw err; }));
     if (tiffCache.size > 200) tiffCache.delete(tiffCache.keys().next().value);
   }
   return tiffCache.get(key);
 }
 
 // Read one single-band COG onto the grid (nearest neighbour).
-async function readBand(href, grid, fillValue = 0) {
-  const tiff = await openTiff(href);
+async function readBand(href, grid, fillValue = 0, headers = null) {
+  const tiff = await openTiff(href, headers);
   const [band] = await tiff.readRasters({
     bbox: grid.bbox, width: grid.width, height: grid.height,
     resampleMethod: 'nearest', fillValue, interleave: false

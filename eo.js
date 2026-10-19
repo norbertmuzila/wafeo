@@ -40,13 +40,19 @@
     openWaterHa: 'Open water assessed (ha)', turbidity: 'Turbidity', chlorophyllAMgM3: 'Chlorophyll-a, approx. (mg/m³)', trophicState: 'Algae level', ndti: 'NDTI (turbidity index)', ndci: 'NDCI (chlorophyll index)',
     soilType: 'Soil type (WRB)', texture: 'Texture (USDA)', sandPct: 'Sand, %', siltPct: 'Silt, %', clayPct: 'Clay, %', pH: 'pH (water)', organicCarbonGkg: 'Organic carbon (g/kg)',
     nitrogenGkg: 'Total nitrogen (g/kg)', cec: 'CEC (cmol(+)/kg)', bulkDensity: 'Bulk density (g/cm³)', availableWaterMmPerM: 'Plant-available water (mm/m)',
-    croplandPct: 'Cropland, %', elevationM: 'Elevation (m)', slopeMeanDeg: 'Mean slope (°)', steepPct: 'Area steeper than 8°, %', landCover: 'Land cover'
+    croplandPct: 'Cropland, %', elevationM: 'Elevation (m)', slopeMeanDeg: 'Mean slope (°)', steepPct: 'Area steeper than 8°, %', landCover: 'Land cover',
+    evaporativeStressIndex: 'Evaporative stress index (ECOSTRESS, 0–1)', evapotranspirationMmDay: 'Evapotranspiration (ECOSTRESS, mm/day)', ecostressDate: 'ECOSTRESS pass',
+    smapSoilMoisture: 'SMAP soil moisture (m³/m³)', smapSoilMoisture7d: 'SMAP soil moisture, 7-day mean', smapDate: 'SMAP pass',
+    groundwaterAnomalyCm: 'Water storage anomaly (GRACE-FO, cm)', groundwaterMonth: 'GRACE-FO month', groundwaterTrendCmYr: 'Water storage trend, 5 years (cm/yr)', groundwaterChange1yCm: 'Water storage vs a year ago (cm)', groundwaterPercentile: 'Storage percentile since 2002',
+    reservoirs: 'Reservoir levels (SWOT)',
+    isdaPh: 'pH (iSDA 30 m)', isdaNitrogenGkg: 'Nitrogen (iSDA, g/kg)', isdaPhosphorusMgKg: 'Phosphorus (iSDA, mg/kg)', isdaPotassiumMgKg: 'Potassium (iSDA, mg/kg)', isdaZincMgKg: 'Zinc (iSDA, mg/kg)', isdaOrganicCarbonGkg: 'Organic carbon (iSDA, g/kg)', isdaTexture: 'Texture (iSDA)'
   };
+  // Preferred readings per card, best first; each card shows the first four available.
   const KEY_METRICS = {
-    crop: ['ndvi', 'ndviAnomaly', 'ndre', 'landSurfaceTempC'],
-    waterQuantity: ['rain90PctNormal', 'rootZoneAvailableWaterPct', 'rainNext16Mm', 'openWaterPctOfHistoricalMax'],
+    crop: ['ndvi', 'ndviAnomaly', 'evaporativeStressIndex', 'ndre', 'landSurfaceTempC'],
+    waterQuantity: ['rain90PctNormal', 'smapSoilMoisture7d', 'rootZoneAvailableWaterPct', 'groundwaterTrendCmYr', 'reservoirs', 'rainNext16Mm', 'openWaterPctOfHistoricalMax'],
     waterQuality: ['turbidity', 'trophicState', 'chlorophyllAMgM3', 'openWaterHa'],
-    soil: ['soilType', 'texture', 'pH', 'organicCarbonGkg'],
+    soil: ['soilType', 'pH', 'isdaPhosphorusMgKg', 'isdaPotassiumMgKg', 'texture', 'organicCarbonGkg'],
     land: ['croplandPct', 'elevationM', 'slopeMeanDeg', 'steepPct']
   };
   const statusClass = s => (/good|low risk/i.test(s) ? 'optimal' : /fair|moderate/i.test(s) ? 'watch' : /poor|critical|high/i.test(s) ? 'concern' : 'neutral');
@@ -185,7 +191,7 @@
   }
 
   // ─── Run the analysis ─────────────────────────────────────
-  const STEPS = ['Searching Sentinel-2 scenes…', 'Reading 10 m bands for your area…', 'Checking Landsat thermal and terrain…', 'Reading SoilGrids soil layers…', 'Comparing rainfall with 25 years of ERA5…', 'Checking rivers and the 16-day forecast…', 'Writing guidance…'];
+  const STEPS = ['Searching Sentinel-2 scenes…', 'Reading 10 m bands for your area…', 'Checking Landsat and ECOSTRESS thermal…', 'Reading SoilGrids and iSDA soil layers…', 'Checking SMAP soil moisture and GRACE-FO groundwater…', 'Comparing rainfall with 25 years of ERA5…', 'Checking rivers, reservoirs and the forecast…', 'Writing guidance…'];
 
   async function run() {
     if (state.busy) return;
@@ -277,7 +283,7 @@
     if (!d) return '';
     // In the dry season, percent-of-normal rainfall is misleading: lead with the season note.
     if (d.metrics && d.metrics.season && keys && keys[0] === 'rain90PctNormal') keys = ['season', ...keys.slice(1)];
-    const metrics = (keys || []).filter(k => d.metrics && d.metrics[k] !== undefined && d.metrics[k] !== null)
+    const metrics = (keys || []).filter(k => d.metrics && d.metrics[k] !== undefined && d.metrics[k] !== null).slice(0, 4)
       .map(k => `<div><span>${esc(METRIC_LABELS[k] || k)}</span><b>${metricValue(k, d.metrics[k])}</b></div>`).join('');
     return `<div class="si-card">
       <div class="si-card-hdr"><div class="si-card-title">${icon} ${esc(title)}</div><span class="si-badge ${statusClass(d.status)}">${esc(d.status)}${Number.isFinite(d.score) ? ' · ' + d.score : ''}</span></div>
@@ -319,9 +325,9 @@
   const PAGE_CONTEXT = {
     'crop-monitoring': { title: 'Crop condition', domains: ['crop'] },
     'precision-farming': { title: 'Field condition', domains: ['crop', 'soil'] },
-    'soil-analysis': { title: 'Soil and soil water', domains: ['soil'], extra: a => metricTable('Soil moisture & water', { metrics: pick(a.domains.waterQuantity.metrics, ['soilMoisture', 'rootZoneAvailableWaterPct']) }) },
+    'soil-analysis': { title: 'Soil and soil water', domains: ['soil'], extra: a => metricTable('Soil moisture & water', { metrics: pick(a.domains.waterQuantity.metrics, ['smapSoilMoisture', 'smapSoilMoisture7d', 'soilMoisture', 'rootZoneAvailableWaterPct']) }) },
     'water-resources': { title: 'Water quantity and quality', domains: ['waterQuantity', 'waterQuality'] },
-    'drought-monitor': { title: 'Drought signals', domains: ['waterQuantity'], extra: a => metricTable('Vegetation response', { metrics: pick(a.domains.crop.metrics, ['ndvi', 'ndviAnomaly', 'ndmi', 'landSurfaceTempC']) }) },
+    'drought-monitor': { title: 'Drought signals', domains: ['waterQuantity'], extra: a => metricTable('Vegetation response', { metrics: pick(a.domains.crop.metrics, ['ndvi', 'ndviAnomaly', 'ndmi', 'evaporativeStressIndex', 'landSurfaceTempC']) }) + metricTable('Groundwater and reservoirs', { metrics: pick(a.domains.waterQuantity.metrics, ['groundwaterAnomalyCm', 'groundwaterTrendCmYr', 'groundwaterPercentile', 'groundwaterMonth', 'reservoirs']) }) },
     'early-warning': { title: 'Early warnings for this area', domains: [], extra: a => issuesShort(a) + `<h4 class="eo-h4">Top actions</h4>` + topActions(a) },
     'food-security': { title: 'Food-security outlook for this area', domains: ['crop', 'waterQuantity'], extra: a => issuesShort(a) }
   };

@@ -9,6 +9,9 @@ const pc = require('./planetary');
 const soil = require('./soil');
 const climate = require('./climate');
 const where = require('./place');
+const nasa = require('./earthdata');
+const isda = require('./isda');
+const { swotLakes } = require('./swot');
 
 const CACHE_TTL = 3 * 60 * 60 * 1000;
 const cache = new Map();
@@ -36,7 +39,7 @@ async function analyzeSite(body) {
   if (hit && Date.now() - hit.at < CACHE_TTL) return { ...hit.result, cached: true };
 
   const c = geo.centroid(aoi);
-  const [placeR, s2Now, s2Prev, s2LastYear, lst, dem, cover, gsw, soilR, wrbR, wx, rain, river] = await Promise.all([
+  const [placeR, s2Now, s2Prev, s2LastYear, lst, dem, cover, gsw, soilR, wrbR, wx, rain, river, ecoR, smapR, graceR, isdaR] = await Promise.all([
     settle('Place', 10000, () => where.place(c)),
     settle('Sentinel-2', 45000, () => s2.analyzeLatest(aoi, now)),
     settle('Sentinel-2 (1 month ago)', 40000, () => s2.ndviInWindow(aoi, 50, 20, now)),
@@ -49,8 +52,15 @@ async function analyzeSite(body) {
     settle('SoilGrids soil type', 30000, () => soil.wrbClass(aoi)),
     settle('Open-Meteo weather', 20000, () => climate.weather(c, now)),
     settle('ERA5 rainfall baseline', 30000, () => climate.rainfallAnomaly(c, null, now)),
-    settle('GloFAS river flow', 20000, () => climate.riverFlow(c))
+    settle('GloFAS river flow', 20000, () => climate.riverFlow(c)),
+    settle('ECOSTRESS', 40000, () => nasa.ecostress(aoi, now)),
+    settle('SMAP', 35000, () => nasa.smap(aoi, now)),
+    settle('GRACE-FO', 40000, () => nasa.grace(aoi)),
+    settle('iSDAsoil', 30000, () => isda.isdaSoil(aoi))
   ]);
+  // SWOT downloads an ~8 MB pass file, so only look when the area holds water.
+  const hasWater = (gsw.value?.maxExtentHa || 0) >= 1 || (s2Now.value?.water?.areaHa || 0) >= 1;
+  const swotR = hasWater ? await settle('SWOT', 40000, () => swotLakes(aoi, now)) : { ok: false, value: { available: false, reason: 'No lake or reservoir in this area.' } };
   const pl = placeR.value || {};
   const fsR = await settle('Food security', 5000, () => where.foodSecurity(pl.country));
 
@@ -66,7 +76,12 @@ async function analyzeSite(body) {
     weather: wx.value || null,
     rainfall: rain.value || null,
     river: river.value || null,
-    foodSecurity: fsR.value || null
+    foodSecurity: fsR.value || null,
+    ecostress: ecoR.value || null,
+    smap: smapR.value || null,
+    grace: graceR.value || null,
+    swot: swotR.value || null,
+    isda: isdaR.value || null
   };
 
   const sources = [
@@ -82,7 +97,12 @@ async function analyzeSite(body) {
     src('ERA5 reanalysis', 'ECMWF Copernicus via Open-Meteo', 'Rainfall anomaly vs 25-year baseline (SPI-style)', rain, () => 'daily · ~25 km'),
     src('GloFAS river discharge', 'Copernicus Emergency Management via Open-Meteo', 'River flow vs long-term median, 14-day flow forecast', river, () => 'daily · ~5 km'),
     src('IPC food security', 'IPC / FEWS NET (WAFEO dataset)', 'National food-insecurity phase', fsR, v => v.phase),
-    ...NOT_CONNECTED
+    src('ECOSTRESS', 'NASA JPL via LP DAAC', 'Evaporative stress index and daily evapotranspiration (crop water stress)', ecoR, v => `${v.date} · 70 m · ${v.clearPct}% clear`),
+    src('SMAP L3 enhanced', 'NASA via NSIDC', 'Satellite surface soil moisture', smapR, v => `${v.latest.date} · 9 km · ${v.observations} passes in 12 days`),
+    src('GRACE / GRACE-FO', 'NASA JPL / GFZ via PO.DAAC', 'Groundwater and total water storage anomaly and trend', graceR, v => `latest ${v.latest.month} · regional (~300 km)`),
+    src('SWOT', 'NASA / CNES via PO.DAAC and Hydrocron', 'Lake and reservoir water level and area', swotR, v => `pass ${v.pass} · ${v.lakes.length} lake(s)`),
+    src('iSDAsoil', 'iSDA Africa', 'Soil nutrients (N, P, K, Ca, Mg, Zn), pH, carbon, texture at 30 m', isdaR, () => '30 m · 0–20 and 20–50 cm'),
+    NISAR
   ];
 
   const analysis = interpret(data);
@@ -99,20 +119,15 @@ async function analyzeSite(body) {
 }
 
 function src(name, provider, measures, r, detail) {
-  let status = r.ok ? 'live' : r.value?.available === false ? 'unavailable' : 'failed';
+  let status = r.ok ? 'live' : /^Not connected/.test(r.value?.reason || '') ? 'not connected' : r.value?.available === false ? 'unavailable' : 'failed';
   let info = '';
   try { info = r.ok && detail ? detail(r.value) || '' : (r.value?.reason || r.error || ''); } catch { info = ''; }
   return { name, provider, measures, status, detail: info };
 }
 
-const NOT_CONNECTED = [
-  ['SMAP', 'NASA', 'Satellite soil moisture (9 km)'],
-  ['GRACE-FO', 'NASA / GFZ', 'Groundwater and total water storage (monthly)'],
-  ['SWOT', 'NASA / CNES', 'Reservoir and river water height and volume'],
-  ['ECOSTRESS', 'NASA', 'Evaporative stress index (70 m)'],
-  ['NISAR', 'NASA / ISRO', 'L-band radar soil moisture (200 m)']
-].map(([name, provider, measures]) => ({ name, provider, measures, status: 'not connected', detail: 'Needs a free NASA Earthdata account token (EARTHDATA_TOKEN).' }))
-  .concat([{ name: 'iSDAsoil', provider: 'iSDA Africa', measures: '30 m African soil nutrients (N, P, K) and pH', status: 'not connected', detail: 'Needs a free iSDA account (ISDA_USERNAME / ISDA_PASSWORD).' }]);
+// NISAR soil moisture exists over Africa only as ~130 MB HDF5 files with no
+// area-subsetting service, which is too heavy to fetch per request.
+const NISAR = { name: 'NISAR', provider: 'NASA / ISRO via ASF', measures: 'L-band radar soil moisture (200 m)', status: 'not connected', detail: 'Provisional data exists, but only as ~130 MB files with no way to request one area; will be added when NASA/ASF offer subsetting.' };
 
 // ═════════════════════════════════════════════════════════════
 //  Interpretation
@@ -161,6 +176,14 @@ function interpret(d) {
     domains.crop.metrics.landSurfaceTempP90C = t.p90;
     if (t.p90 >= 40) add('crop', t.p90 >= 45 ? 'high' : 'medium', 'Heat stress on the land surface', `Hottest 10% of the area reached ${t.p90} °C surface temperature.`, `Landsat ${d.landsat.date}`);
   }
+  if (d.ecostress?.available) {
+    const e = d.ecostress;
+    domains.crop.metrics.evaporativeStressIndex = e.esi.mean;
+    domains.crop.metrics.evapotranspirationMmDay = e.etDailyMm;
+    domains.crop.metrics.ecostressDate = e.date;
+    const vegetated = (d.sentinel2?.indices?.ndvi?.mean ?? 0) >= 0.3;
+    if (vegetated && e.esi.mean < 0.4) add('crop', e.esi.mean < 0.25 ? 'high' : 'medium', 'Crops are water-stressed (ECOSTRESS)', `Evaporative stress index ${e.esi.mean}: plants are using only about ${Math.round(e.esi.mean * 100)}% of the water they could. This shows 1–2 weeks before leaves wilt.`, `ECOSTRESS ${e.date}`);
+  }
 
   // ─── Water quantity ───
   const wq = { metrics: {}, score: 60 };
@@ -183,6 +206,11 @@ function interpret(d) {
     if (wx.next16.hotDays >= 3) add('climate', wx.next16.hotDays >= 6 ? 'high' : 'medium', 'Heatwave days ahead', `${wx.next16.hotDays} days ≥ 35 °C forecast in the next 16 days (max ${wx.next16.maxTempC} °C).`, 'Open-Meteo forecast');
     if (wb16 !== null && wb16 < -50 && !drySeason) add('water', 'medium', 'Crops will lose more water than rain supplies', `Forecast rain ${wx.next16.rainMm} mm vs evaporative demand ${wx.next16.et0Mm} mm over 16 days.`, 'Open-Meteo forecast');
     if (wx.next16.rainMm >= 120) add('water', 'medium', 'Heavy rain forecast', `${wx.next16.rainMm} mm expected over 16 days. Risk of flooding and nutrient wash-off.`, 'Open-Meteo forecast');
+  }
+  if (d.smap?.available) {
+    const sm = d.smap.mean7d ?? d.smap.latest.soilMoisture;
+    Object.assign(wq.metrics, { smapSoilMoisture: d.smap.latest.soilMoisture, smapSoilMoisture7d: d.smap.mean7d, smapDate: d.smap.latest.date });
+    if (!drySeason && sm < 0.1) add('water', sm < 0.06 ? 'high' : 'medium', 'Satellite shows very dry topsoil (SMAP)', `Surface soil moisture about ${sm} m³/m³ over the last week.`, `SMAP ${d.smap.latest.date}`);
   }
   // Root-zone water relative to this soil's available-water range.
   const topSoil = d.soil?.layers?.['15-30cm'] || d.soil?.layers?.['0-5cm'];
@@ -213,7 +241,22 @@ function interpret(d) {
     if (d.river.pctOfMedian !== null && d.river.pctOfMedian < 50 && d.river.medianM3s > 1) add('water', 'medium', 'River flow well below normal', `Nearest modelled river runs at ${d.river.pctOfMedian}% of its median flow.`, 'GloFAS');
     if (d.river.forecastPeakPctOfMedian >= 300 && d.river.medianM3s > 1) add('water', 'high', 'River flood pulse forecast', `Flow may reach ${d.river.forecastPeakPctOfMedian}% of median around ${d.river.forecastPeakDate}.`, 'GloFAS forecast');
   }
-  wq.metrics.groundwater = 'Not measured: GRACE-FO needs a NASA Earthdata token.';
+  if (d.grace?.available) {
+    const gr = d.grace;
+    Object.assign(wq.metrics, { groundwaterAnomalyCm: gr.latest.anomalyCm, groundwaterMonth: gr.latest.month, groundwaterTrendCmYr: gr.trend5yCmPerYear, groundwaterChange1yCm: gr.changeVsYearAgoCm, groundwaterPercentile: gr.percentileOfRecord });
+    if (gr.trend5yCmPerYear !== null && gr.trend5yCmPerYear <= -1) add('water', gr.trend5yCmPerYear <= -2 ? 'high' : 'medium', 'Groundwater and water storage are declining', `Total water storage has fallen about ${Math.abs(gr.trend5yCmPerYear)} cm per year over five years.`, `GRACE-FO to ${gr.latest.month}`);
+    if (gr.percentileOfRecord <= 10) add('water', 'high', 'Regional water storage near its lowest on record', `Storage anomaly ${gr.latest.anomalyCm} cm is lower than ${100 - gr.percentileOfRecord}% of months since 2002.`, `GRACE-FO to ${gr.latest.month}`);
+  } else {
+    wq.metrics.groundwater = d.grace?.reason || 'Not measured.';
+  }
+  if (d.swot?.available) {
+    wq.metrics.reservoirs = d.swot.lakes.map(l => `${l.name || 'Lake ' + l.lakeId}: ${l.wseM} m on ${l.latestDate}${l.change30dM !== null ? `, ${l.change30dM >= 0 ? '+' : ''}${l.change30dM} m in 30 days` : ''}${l.change1yM !== null ? `, ${l.change1yM >= 0 ? '+' : ''}${l.change1yM} m vs a year ago` : ''}${l.levelPctOfRange !== null ? `, ${l.levelPctOfRange}% of observed range` : ''}`).join(' · ');
+    for (const l of d.swot.lakes) {
+      const nm = l.name || `Lake ${l.lakeId}`;
+      if (l.levelPctOfRange !== null && l.levelPctOfRange <= 20 && l.observations >= 10) add('water', 'high', `${nm}: water level near its lowest since SWOT began`, `Level ${l.wseM} m on ${l.latestDate}, at ${l.levelPctOfRange}% of its range since ${l.recordStart}.`, `SWOT ${l.latestDate}`);
+      else if (l.change30dM !== null && l.change30dM <= -0.5) add('water', 'medium', `${nm}: water level falling`, `Down ${Math.abs(l.change30dM)} m in about a month (now ${l.wseM} m).`, `SWOT ${l.latestDate}`);
+    }
+  }
   domains.waterQuantity = { score: Math.round(wq.score), status: label(wq.score), metrics: wq.metrics, summary: waterQuantitySummary(wq.metrics, drySeason) };
 
   // ─── Water quality (optical, open water only) ───
@@ -253,6 +296,26 @@ function interpret(d) {
     };
   } else {
     domains.soil = { score: null, status: 'No data', metrics: { soilType: d.soil?.wrb?.name || null }, summary: (d.soil?.wrb?.name ? `Soil type: ${d.soil.wrb.name}. ` : '') + (d.soil?.reason || 'Soil properties unavailable.') };
+  }
+
+  if (d.isda?.available) {
+    const top = d.isda.topsoil;
+    const v = p => isda.num(top, p);
+    const ph = v('ph'), P = v('phosphorous_extractable'), K = v('potassium_extractable'), N = v('nitrogen_total'), Zn = v('zinc_extractable'), soc = v('carbon_organic');
+    const tex = top.texture_class ? top.texture_class.value : null;
+    Object.assign(domains.soil.metrics, { isdaPh: ph, isdaNitrogenGkg: N, isdaPhosphorusMgKg: P, isdaPotassiumMgKg: K, isdaZincMgKg: Zn, isdaOrganicCarbonGkg: soc, isdaTexture: tex });
+    const ev = 'iSDAsoil 30 m (Mehlich-3)';
+    let penalty = 0;
+    const flag = (lvl, title, detail) => { add('soil', lvl, title, detail, ev); penalty += SEV[lvl] * 6; };
+    if (P !== null && P < 15) flag(P < 8 ? 'high' : 'medium', 'Low soil phosphorus', `Extractable phosphorus about ${r1(P)} mg/kg in the top 20 cm.`);
+    if (K !== null && K < 80) flag('medium', 'Low soil potassium', `Extractable potassium about ${r1(K)} mg/kg in the top 20 cm.`);
+    if (Zn !== null && Zn < 1) flag('low', 'Low soil zinc', `Extractable zinc about ${r2(Zn)} mg/kg.`);
+    if (ph !== null && ph < 5.5 && !issues.some(i => /acidic/i.test(i.title))) flag(ph < 5 ? 'high' : 'medium', ph < 5 ? 'Strongly acidic soil' : 'Acidic soil', `Topsoil pH ${r1(ph)} (iSDA 30 m).`);
+    const nutrients = [P !== null && `P ${r1(P)} mg/kg`, K !== null && `K ${r1(K)} mg/kg`, N !== null && `N ${r2(N)} g/kg`].filter(Boolean).join(', ');
+    if (nutrients) domains.soil.summary += ` iSDA 30 m: ${nutrients}.`;
+    if (Number.isFinite(domains.soil.score)) domains.soil.score = Math.round(clamp(domains.soil.score - penalty, 0, 100));
+    else domains.soil.score = Math.round(clamp(70 - penalty, 0, 100));
+    domains.soil.status = label(domains.soil.score);
   }
 
   // ─── Land & terrain ───
@@ -328,14 +391,14 @@ function recommend(issues, domains, d, drySeason) {
   const push = (who, sev, action, why) => out[who].push({ severity: sev, action, why });
   const has = (pred) => issues.find(pred);
 
-  const drought = has(i => i.domain === 'water' && /deficit|below normal|near wilting|lose more water/i.test(i.title));
+  const drought = has(i => i.domain === 'water' && /deficit|below normal|near wilting|lose more water|very dry topsoil/i.test(i.title));
   if (drought) {
     push('farmers', drought.severity, 'Save soil water now: mulch, keep crop residue on the surface, and dig planting basins or tied ridges.', drought.detail);
     push('farmers', drought.severity, 'Choose drought-tolerant, early-maturing varieties (sorghum, pearl millet, short-season maize) and stagger planting dates.', 'Rainfall and soil water are below what crops need.');
     push('government', drought.severity, 'Issue a drought advisory for this area and pre-position seed, feed and water support (anticipatory action).', drought.detail);
     push('public', drought.severity, 'Use water sparingly and store safe drinking water; expect higher food prices if the deficit continues.', drought.detail);
   }
-  const lowWater = has(i => /very low|below its usual extent|River flow well below/i.test(i.title));
+  const lowWater = has(i => /very low|below its usual extent|River flow well below|water level/i.test(i.title));
   if (lowWater) {
     push('government', lowWater.severity, 'Prioritise water allocation from dams for drinking and livestock; schedule irrigation rotations.', lowWater.detail);
     push('farmers', lowWater.severity, 'Switch to drip or furrow irrigation at night and irrigate by soil moisture, not by calendar.', lowWater.detail);
@@ -353,7 +416,7 @@ function recommend(issues, domains, d, drySeason) {
   }
   const n = has(i => /nitrogen/i.test(i.title));
   if (n) push('farmers', n.severity, 'Apply nitrogen top-dressing (e.g. ammonium nitrate or urea) where the crop looks pale, split into two doses; plant legumes in rotation.', n.detail);
-  const canopy = has(i => /canopy is drying/i.test(i.title));
+  const canopy = has(i => /canopy is drying|water-stressed/i.test(i.title));
   if (canopy) push('farmers', canopy.severity, 'Crops show leaf water stress: irrigate if possible within the next week and scout for wilting in the field.', canopy.detail);
   const decline = has(i => /declining|weaker than the same season/i.test(i.title));
   if (decline) {
@@ -373,6 +436,19 @@ function recommend(issues, domains, d, drySeason) {
   if (erosion) {
     push('farmers', erosion.severity, 'Build contour ridges or stone bunds and keep soil covered to stop erosion.', erosion.detail);
     push('government', erosion.severity, 'Include this area in catchment conservation works (contours, gully reclamation).', erosion.detail);
+  }
+  const lowP = has(i => /Low soil phosphorus/i.test(i.title));
+  if (lowP) push('farmers', lowP.severity, 'Apply phosphate at planting (e.g. Compound D or single superphosphate placed in the planting basin), and confirm with a soil test.', lowP.detail);
+  const lowK = has(i => /Low soil potassium/i.test(i.title));
+  if (lowK) push('farmers', lowK.severity, 'Add potassium (muriate of potash or a compound fertiliser with K), especially for maize, tobacco and potatoes.', lowK.detail);
+  const lowZn = has(i => /Low soil zinc/i.test(i.title));
+  if (lowZn) push('farmers', lowZn.severity, 'Use a zinc-containing fertiliser or zinc sulphate to avoid hidden yield loss in maize and rice.', lowZn.detail);
+  if (lowP || lowK) push('government', (lowP || lowK).severity, 'Target fertiliser support to the nutrients this area lacks (P and K, not only nitrogen), using iSDA soil maps.', (lowP || lowK).detail);
+  const groundwater = has(i => /Groundwater|water storage near/i.test(i.title));
+  if (groundwater) {
+    push('government', groundwater.severity, 'Regulate borehole drilling and abstraction, monitor well levels, and invest in recharge (sand dams, check dams, wetland protection).', groundwater.detail);
+    push('farmers', groundwater.severity, 'Avoid deepening boreholes for irrigation; switch to drip irrigation and water-efficient crops.', groundwater.detail);
+    push('public', groundwater.severity, 'Protect boreholes and wells from overuse and report failing water points.', groundwater.detail);
   }
   const quality = has(i => i.domain === 'waterQuality');
   if (quality) {
