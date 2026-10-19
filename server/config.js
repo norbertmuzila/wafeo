@@ -70,7 +70,8 @@ module.exports = {
   adminEmails: (process.env.ADMIN_EMAILS || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean),
   corsOrigins,
   groqApiKey: process.env.GROQ_API_KEY || '',
-  groqModel: process.env.GROQ_MODEL || 'llama-3.3-70b-versatile',
+  // Tried in order; a retired model falls through to the next one.
+  groqModels: [...new Set([process.env.GROQ_MODEL, 'openai/gpt-oss-120b', 'openai/gpt-oss-20b'].filter(Boolean))],
   dataDir: require('path').join(__dirname, '..', 'data'),
   // Lets tests point the JSON store at a temp copy without touching data/.
   usersFile: process.env.WAFEO_USERS_FILE || null

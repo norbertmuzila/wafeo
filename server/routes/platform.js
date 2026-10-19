@@ -32,23 +32,30 @@ router.post('/ai/chat', aiLimiter, async (req, res) => {
   }
 
   try {
-    const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${config.groqApiKey}` },
-      body: JSON.stringify({
-        model: config.groqModel,
-        messages: [{ role: 'system', content: SYSTEM_PROMPT }, ...messages],
-        temperature: 0.5,
-        max_tokens: 1024
-      }),
-      signal: AbortSignal.timeout(30000)
-    });
-    if (!r.ok) {
-      console.error('[ai] Groq error:', r.status, (await r.text()).slice(0, 300));
-      return res.status(502).json({ error: 'AI provider error', reply: 'Sorry, the AI service returned an error. Please try again shortly.' });
+    for (const model of config.groqModels) {
+      const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${config.groqApiKey}` },
+        body: JSON.stringify({
+          model,
+          messages: [{ role: 'system', content: SYSTEM_PROMPT }, ...messages],
+          temperature: 0.5,
+          max_tokens: 1024,
+          // gpt-oss models reason before answering; keep that short.
+          ...(model.startsWith('openai/gpt-oss') ? { reasoning_effort: 'low' } : {})
+        }),
+        signal: AbortSignal.timeout(30000)
+      });
+      if (r.ok) {
+        const data = await r.json();
+        return res.json({ reply: data?.choices?.[0]?.message?.content || 'No response generated.' });
+      }
+      const errText = (await r.text()).slice(0, 300);
+      console.error('[ai] Groq error:', model, r.status, errText);
+      // Retired or unknown model: try the next one. Anything else is final.
+      if (!(r.status === 404 || (r.status === 400 && /model/i.test(errText)))) break;
     }
-    const data = await r.json();
-    res.json({ reply: data?.choices?.[0]?.message?.content || 'No response generated.' });
+    res.status(502).json({ error: 'AI provider error', reply: 'Sorry, the AI service returned an error. Please try again shortly.' });
   } catch (err) {
     console.error('[ai] Request failed:', err.message);
     res.status(502).json({ error: 'AI request failed', reply: 'Sorry, I could not reach the AI service right now.' });
