@@ -1,7 +1,10 @@
 // ─── Read only the pixels covering an AOI from cloud GeoTIFFs ─
 // Uses HTTP range requests, so a farm costs kilobytes, not whole scenes.
 
-const { fromUrl, fromArrayBuffer } = require('geotiff');
+// geotiff's CommonJS build require()s an ESM-only dependency, which Vercel's
+// runtime rejects; load its ES module build instead.
+let geotiffModule = null;
+const geotiff = () => (geotiffModule ||= import('geotiff'));
 const { projectRing, pointInRing } = require('./geo');
 
 const MAX_PIXELS = 160000; // 400 × 400 per band keeps memory and time bounded
@@ -38,7 +41,7 @@ const tiffCache = new Map();
 function openTiff(href) {
   const key = href.split('?')[0];
   if (!tiffCache.has(key)) {
-    tiffCache.set(key, fromUrl(href, { allowFullFile: false }).catch(err => { tiffCache.delete(key); throw err; }));
+    tiffCache.set(key, geotiff().then(g => g.fromUrl(href, { allowFullFile: false })).catch(err => { tiffCache.delete(key); throw err; }));
     if (tiffCache.size > 200) tiffCache.delete(tiffCache.keys().next().value);
   }
   return tiffCache.get(key);
@@ -56,7 +59,7 @@ async function readBand(href, grid, fillValue = 0) {
 
 // Decode a small GeoTIFF already downloaded (e.g. from a WCS service).
 async function decodeSmallTiff(buffer) {
-  const tiff = await fromArrayBuffer(buffer);
+  const tiff = await (await geotiff()).fromArrayBuffer(buffer);
   const image = await tiff.getImage();
   const [band] = await image.readRasters();
   return { band, width: image.getWidth(), height: image.getHeight(), bbox: image.getBoundingBox(), nodata: image.getGDALNoData() };

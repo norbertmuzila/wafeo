@@ -10,6 +10,9 @@ const config = require('./config');
 const store = require('./store');
 
 const app = express();
+
+// A stray rejection inside a data library must not take the whole server down.
+process.on('unhandledRejection', err => console.error('[unhandledRejection]', err));
 const ROOT = path.join(__dirname, '..');
 
 app.disable('x-powered-by');
