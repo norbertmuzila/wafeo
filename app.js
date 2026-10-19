@@ -1463,35 +1463,56 @@ async function analyzeRegion(query) {
       siMarker = L.circleMarker([targetLat, targetLon], { radius: 12, fillColor: 'var(--accent-emerald)', color: '#fff', weight: 3, opacity: 1, fillOpacity: 0.8 }).addTo(siMap);
     }
 
-    // 2. Fetch Live Climate/Weather from Open-Meteo
-    const weatherRes = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${targetLat}&longitude=${targetLon}&current_weather=true&daily=temperature_2m_max,precipitation_sum&timezone=auto`);
-    const weatherData = await weatherRes.json();
-    
-    const currentTemp = weatherData.current_weather ? weatherData.current_weather.temperature : 25;
-    const precipSum = (weatherData.daily && weatherData.daily.precipitation_sum) ? weatherData.daily.precipitation_sum[0] : 0;
-    
-    // Simulate NDVI/Water stats based on live real-world weather inputs
-    const isDry = precipSum < 2 && currentTemp > 30;
-    const ndviEstimate = isDry ? (Math.random() * 0.3 + 0.2).toFixed(2) : (Math.random() * 0.4 + 0.5).toFixed(2);
-    
+    // 2. Fetch Live Climate/Weather from Open-Meteo. If the service is down we
+    // say so rather than showing made-up "live" values.
+    let weather = null;
+    try {
+      const weatherRes = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${targetLat}&longitude=${targetLon}&current_weather=true&daily=temperature_2m_max,precipitation_sum&timezone=auto`, { signal: AbortSignal.timeout(12000) });
+      if (weatherRes.ok) {
+        const w = await weatherRes.json();
+        if (w.current_weather && w.daily && w.daily.precipitation_sum) {
+          weather = { temp: w.current_weather.temperature, precip: w.daily.precipitation_sum[0] ?? 0 };
+        }
+      }
+    } catch (e) {
+      console.warn('Open-Meteo unavailable:', e.message);
+    }
+
+    const currentTemp = weather ? weather.temp : null;
+    const precipSum = weather ? weather.precip : null;
+    const isDry = !!weather && precipSum < 2 && currentTemp > 30;
+
+    // Weather-based vegetation estimate (not a satellite reading). Deterministic
+    // per location so the same place always gets the same value.
+    const coordSeed = Math.abs(Math.sin(targetLat * 12.9898 + targetLon * 78.233)) % 1;
+    let ndviBase = 0.55 + (coordSeed - 0.5) * 0.12;
+    if (weather) {
+      if (isDry) ndviBase -= 0.25;
+      else if (precipSum > 5) ndviBase += 0.08;
+      if (currentTemp > 35) ndviBase -= 0.08;
+    }
+    const ndviEstimate = Math.min(0.9, Math.max(0.1, ndviBase)).toFixed(2);
+    const ndviLow = parseFloat(ndviEstimate) < 0.4;
+    const weatherNote = 'Live weather is temporarily unavailable from Open-Meteo.';
+
     // Construct Dynamic Overview
     let overview = [
       { id: 'farming', title: 'Farming Infrastructure', icon: siSvgs.farming, badge: 'Optimal', badgeClass: 'optimal', desc: `Region supports active agricultural infrastructure. Thermal scanning shows normal utilization levels.` },
-      { id: 'water', title: 'Water Hydrology', icon: siSvgs.water, badge: isDry ? 'Concern' : 'Optimal', badgeClass: isDry ? 'concern' : 'optimal', desc: `Live precipitation recorded at ${precipSum}mm. ${isDry ? 'Severe stress on local irrigation' : 'Water flow and local irrigation networks are stable.'}` },
-      { id: 'agriculture', title: 'Agriculture & Vegetation', icon: siSvgs.agriculture, badge: parseFloat(ndviEstimate) < 0.4 ? 'Watch' : 'Optimal', badgeClass: parseFloat(ndviEstimate) < 0.4 ? 'watch' : 'optimal', desc: `Estimated vegetation health (NDVI) is ${ndviEstimate}. ${parseFloat(ndviEstimate) < 0.4 ? 'Crops showing signs of stress.' : 'Vegetation is extremely healthy.'}` },
-      { id: 'climate', title: 'Climate & Heat', icon: siSvgs.climate, badge: currentTemp > 32 ? 'Concern' : 'Watch', badgeClass: currentTemp > 32 ? 'concern' : 'watch', desc: `Live surface temperature is ${currentTemp} °C. ${currentTemp > 32 ? 'Extreme heat detected.' : 'Normal seasonal thermal signature.'}` },
-      { id: 'foodSec', title: 'Food Security Alert', icon: siSvgs.foodSec, badge: isDry ? 'Concern' : 'Watch', badgeClass: isDry ? 'concern' : 'watch', desc: `Region IPC phase estimated based on local weather yields. ${isDry ? 'High risk of yield reduction.' : 'Stable local market forecast.'}` }
+      { id: 'water', title: 'Water Hydrology', icon: siSvgs.water, badge: !weather ? 'No data' : isDry ? 'Concern' : 'Optimal', badgeClass: !weather ? 'watch' : isDry ? 'concern' : 'optimal', desc: weather ? `Live precipitation today: ${precipSum} mm. ${isDry ? 'Severe stress on local irrigation.' : 'Water flow and local irrigation networks are stable.'}` : weatherNote },
+      { id: 'agriculture', title: 'Agriculture & Vegetation', icon: siSvgs.agriculture, badge: ndviLow ? 'Watch' : 'Optimal', badgeClass: ndviLow ? 'watch' : 'optimal', desc: `Weather-based vegetation estimate (NDVI): ${ndviEstimate}. ${ndviLow ? 'Crops likely under stress.' : 'Vegetation likely healthy.'} Open Crop Monitoring for satellite NDVI.` },
+      { id: 'climate', title: 'Climate & Heat', icon: siSvgs.climate, badge: !weather ? 'No data' : currentTemp > 32 ? 'Concern' : 'Watch', badgeClass: !weather ? 'watch' : currentTemp > 32 ? 'concern' : 'watch', desc: weather ? `Live air temperature: ${currentTemp} °C. ${currentTemp > 32 ? 'Extreme heat detected.' : 'Normal seasonal thermal signature.'}` : weatherNote },
+      { id: 'foodSec', title: 'Food Security Alert', icon: siSvgs.foodSec, badge: isDry ? 'Concern' : 'Watch', badgeClass: isDry ? 'concern' : 'watch', desc: `Region IPC phase estimated from local weather. ${isDry ? 'High risk of yield reduction.' : 'Stable local market forecast.'}` }
     ];
 
     let evidence = [
-      { title: 'Vegetation Shift (30d)', trend: parseFloat(ndviEstimate) < 0.4 ? 'negative' : 'positive', desc: `NDVI trended ${parseFloat(ndviEstimate) < 0.4 ? 'downward' : 'upward'} following recent weather patterns.` },
-      { title: 'Hydrology Change (7d)', trend: isDry ? 'negative' : 'positive', desc: `Recent precipitation sum of ${precipSum}mm drove a ${isDry ? 'decrease' : 'steady state'} in soil moisture.` }
+      { title: 'Vegetation Shift (30d)', trend: ndviLow ? 'negative' : 'positive', desc: `Vegetation likely trending ${ndviLow ? 'downward' : 'upward'} given recent weather patterns.` },
+      { title: 'Hydrology Change (7d)', trend: isDry ? 'negative' : 'positive', desc: weather ? `Today's precipitation of ${precipSum} mm points to ${isDry ? 'falling' : 'steady'} soil moisture.` : weatherNote }
     ];
 
     // Restore Chivaraidze specifics if searched
     if (typeof query === 'string' && query.toLowerCase().includes('chivaraidze')) {
         overview[0].desc = 'Multi-enterprise farming operational: Milling plants, Abattoirs, and Freeze drying facilities active.';
-        overview[1].desc = `Live precipitation: ${precipSum}mm. Permanent water is adjacent. SAZ certified water plant fully operational and scaling.`;
+        overview[1].desc = `${weather ? `Live precipitation: ${precipSum} mm.` : weatherNote} Permanent water is adjacent. SAZ certified water plant fully operational and scaling.`;
         overview[2].desc = `Vegetation is robust (NDVI ${ndviEstimate}). Crops: Maize, Wheat, Soya, Pawpaw, Macadamia. Livestock: 300 cattle, 600 goats.`;
         evidence = [
           { title: 'Vegetation & ecosystem', trend: 'positive', desc: 'NDVI improved by +0.04 (12%) due to recent implementation of multi-enterprise horticulture.' },
@@ -1523,7 +1544,8 @@ async function analyzeRegion(query) {
 
     document.getElementById('siRegList').innerHTML = `
       <div class="si-reg-item">
-        <div class="si-reg-title"><span>Water Use Compliance</span> <span class="si-reg-status compliant">Compliant</span></div>
+        <div class="si-card-desc" style="margin-bottom:8px;font-style:italic">Illustrative example. Regulatory datasets are not yet connected for this location.</div>
+      <div class="si-reg-title"><span>Water Use Compliance</span> <span class="si-reg-status compliant">Compliant</span></div>
         <div class="si-card-desc">Irrigation extraction aligns with regional water quotas.</div>
       </div>
       <div class="si-reg-item">

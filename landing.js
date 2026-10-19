@@ -277,12 +277,15 @@
     { name: 'SMAP', kind: 'L-band', source: 'Passive microwave radiometer · 2 to 3 day revisit · NASA',
       measures: [['Surface soil moisture', '9 km · 2 to 3 day'], ['Root-zone soil moisture', '9 km · 3 day'], ['Freeze and thaw state', '9 km · daily']],
       powers: ['Drought Monitor', 'Soil Analysis', 'Precision Farming'] },
+    { name: 'NISAR', kind: 'L- & S-band SAR', source: 'Dual-band radar, cloud-penetrating · 12-day revisit · NASA / ISRO',
+      measures: [['Soil moisture', '200 m · 12 day'], ['Crop and vegetation structure', 'high resolution · 12 day'], ['Ground deformation', 'high resolution · 12 day']],
+      powers: ['Soil Analysis', 'Global Dashboard', 'Precision Farming'] },
     { name: 'GRACE-FO', kind: 'Gravity', source: 'Satellite gravimetry · monthly · NASA / GFZ',
       measures: [['Groundwater storage change', '~300 km · monthly'], ['Total water storage', '~300 km · monthly']],
       powers: ['Water Resources', 'Drought Monitor', 'Early Warning'] },
     { name: 'CHIRPS', kind: 'Rainfall', source: 'Satellite and station rainfall · daily · Climate Hazards Center, UCSB',
-      measures: [['Rainfall', '5 km · daily'], ['Rainfall anomaly vs. normal', '5 km · 10-day']],
-      powers: ['Food Security', 'Early Warning', 'Drought Monitor'] }
+      measures: [['Rainfall', '5 km · daily'], ['Rainfall anomaly vs. normal', '5 km · 10-day'], ['Standardized Precipitation Index (SPI)', '5 km · monthly']],
+      powers: ['Drought Monitor', 'Early Warning', 'Food Security'] }
   ];
   const tabs = $('#lpTabs');
   const panel = $('#lpPanel');
@@ -328,16 +331,16 @@
   // ─── Platform modules ───────────────────────────────────────
   const icon = d => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
   const MODULES = [
-    ['dashboard', 'Global Dashboard', 'Continental picture of crop health, water and alerts at a glance.', '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>'],
-    ['site-intelligence', 'Site Intelligence', 'Search any place on Earth for live weather, terrain and EO signals.', '<circle cx="11" cy="11" r="6"/><path d="m20 20-4.5-4.5"/>'],
-    ['precision-farming', 'Precision Farming', 'Field-by-field vigour maps that show where inputs matter most.', '<path d="M4 20 12 4l8 16"/><path d="M7 14h10"/>'],
-    ['crop-monitoring', 'Crop Monitoring', 'NDVI through the season, with an LSTM forecast of what comes next.', '<path d="M12 21V9"/><path d="M12 13c-4 0-6-3-6-7 4 0 6 3 6 7Z"/><path d="M12 11c0-4 2-7 6-7 0 4-2 7-6 7Z"/>'],
-    ['soil-analysis', 'Soil Analysis', 'Moisture, temperature and degradation risk beneath the canopy.', '<path d="M3 8h18M3 13h18M3 18h18"/>'],
-    ['water-resources', 'Water Resources', 'Lakes, reservoirs and groundwater tracked from orbit.', '<path d="M12 3s6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 6-11 6-11Z"/>'],
-    ['drought-monitor', 'Drought Monitor', 'Rainfall deficits and vegetation stress before they become crises.', '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>'],
-    ['food-security', 'Food Security', 'IPC phases and the people behind them, region by region.', '<path d="M4 11h16a8 8 0 0 1-16 0Z"/><path d="M8 7c0-2 1-3 2-3M12 7c0-2 1-3 2-3"/>'],
-    ['early-warning', 'Early Warning', 'Floods, droughts and pests flagged with time to respond.', '<path d="M12 3 2 20h20L12 3Z"/><path d="M12 10v4M12 17h.01"/>'],
-    ['reports', 'Reports', 'Briefings with AI summaries and live news from FAO, WFP and NASA.', '<path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5M10 13h6M10 17h6"/>']
+    ['dashboard', 'Global Dashboard', 'Live world map of crop health, water risk and alerts, continent by continent.', '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>'],
+    ['site-intelligence', 'Site Intelligence', 'Search any region for farming, water, agriculture and climate metrics, in 2D or 3D.', '<circle cx="11" cy="11" r="6"/><path d="m20 20-4.5-4.5"/>'],
+    ['precision-farming', 'Precision Farming', 'Field-by-field NDVI analysis, irrigation guidance and yield forecasts.', '<path d="M4 20 12 4l8 16"/><path d="M7 14h10"/>'],
+    ['crop-monitoring', 'Crop Monitoring', 'NDVI time series and growth-stage tracking from Sentinel-2 and MODIS.', '<path d="M12 21V9"/><path d="M12 13c-4 0-6-3-6-7 4 0 6 3 6 7Z"/><path d="M12 11c0-4 2-7 6-7 0 4-2 7-6 7Z"/>'],
+    ['soil-analysis', 'Soil Analysis', 'Soil moisture from NISAR, SMAP and Sentinel-1, with groundwater from GRACE-FO.', '<path d="M3 8h18M3 13h18M3 18h18"/>'],
+    ['water-resources', 'Water Resources', 'Reservoirs, lakes, snow and groundwater storage tracked from orbit.', '<path d="M12 3s6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 6-11 6-11Z"/>'],
+    ['drought-monitor', 'Drought Monitor', 'SPI, SPEI and vegetation condition indices that flag drought early.', '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>'],
+    ['food-security', 'Food Security', 'IPC food-insecurity phases and the people affected, region by region.', '<path d="M4 11h16a8 8 0 0 1-16 0Z"/><path d="M8 7c0-2 1-3 2-3M12 7c0-2 1-3 2-3"/>'],
+    ['early-warning', 'Early Warning', '90-day IPC-compatible forecasts from satellite, weather, price and conflict data.', '<path d="M12 3 2 20h20L12 3Z"/><path d="M12 10v4M12 17h.01"/>'],
+    ['reports', 'Reports', 'AI-assisted reports, saved briefings and live news from FAO, WFP, NASA and more.', '<path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5M10 13h6M10 17h6"/>']
   ];
   const modulesEl = $('#lpModules');
   modulesEl.innerHTML = MODULES.map((m, i) => `
