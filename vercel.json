@@ -4,7 +4,14 @@
     {
       "src": "api/index.js",
       "use": "@vercel/node",
-      "config": { "includeFiles": ["data/**", "server/**", "lib/**"] }
+      "config": {
+        "includeFiles": [
+          "data/**",
+          "server/**",
+          "lib/**"
+        ],
+        "maxDuration": 60
+      }
     },
     {
       "src": "index.html",
@@ -20,6 +27,10 @@
     },
     {
       "src": "privacy.html",
+      "use": "@vercel/static"
+    },
+    {
+      "src": "eo.js",
       "use": "@vercel/static"
     },
     {

@@ -13,6 +13,7 @@ automatically (role `researcher`). Admins can change roles in **Settings → Reg
 ```
 index.html, style.css, app.js   Frontend (single-page app, no build step)
 landing.css, landing.js         Home page: pinned scroll hero, sections, hand-off to sign-in
+eo.js                           Live satellite site analysis UI (Site Intelligence, page context, reports)
 assets/                         Logo and static images (assets/landing/ = home page photo)
 data/*.json                     Reference datasets + local user store
 server.js                       Local entry point: `npm start`
@@ -25,7 +26,14 @@ server/
   routes/auth.js                /api/auth/*  login, google, register, me, logout
   routes/data.js                Dashboard datasets + live news
   routes/platform.js            AI assistant, reports, activity log, admin
+  routes/eo.js                  /api/eo/analyze and /api/eo/ndvi-series
   services/news.js              ReliefWeb + RSS news aggregator (15-min cache)
+  services/eo/                  Satellite analysis engine:
+    sentinel2.js                  Sentinel-2 L2A: NDVI/EVI/SAVI, red-edge N, NDMI, BSI, water, NDTI, NDCI, 24-month NDVI
+    planetary.js                  Landsat 8/9 LST, Copernicus DEM, ESA WorldCover, JRC Global Surface Water
+    soil.js                       ISRIC SoilGrids (WCS): texture, pH, SOC, N, CEC, bulk density, WRB type, AWC
+    climate.js                    Open-Meteo: weather, ET0, soil moisture, ERA5 rainfall anomaly, GloFAS rivers
+    analyze.js                    Fuses sources into scores, ranked issues, and actions for farmers/government/public
 lib/firebase.js                 Firebase Admin initialisation
 firebase-seed.js                One-off: copy data/*.json into Firestore (`npm run seed`)
 tests/api.test.js               API tests (`npm test`)
@@ -90,6 +98,24 @@ All endpoints except health and auth require `Authorization: Bearer <token>`.
 | GET/POST | `/api/reports` | Saved reports (per user) |
 | GET | `/api/admin/users`, `/api/admin/activity` | Admin only |
 | POST | `/api/admin/users/:id/role` | Admin only, `{ role }` |
+
+## Live satellite analysis
+
+In **Site Intelligence**, choose a point and radius or draw a farm boundary and press **Analyse with satellites**. The server reads only the pixels inside the area (HTTP range requests on cloud-optimised GeoTIFFs), so a farm costs kilobytes and takes ~5–20 seconds.
+
+| Source | What it gives | Access |
+|---|---|---|
+| Sentinel-2 L2A (ESA) | Crop vigour, nitrogen, canopy water, bare soil, open water, turbidity, chlorophyll-a; 24-month NDVI | Microsoft Planetary Computer, keyless |
+| Landsat 8/9 (USGS/NASA) | Land surface temperature (heat stress) | Planetary Computer, keyless |
+| Copernicus DEM GLO-30 | Elevation, slope, erosion risk | Planetary Computer, keyless |
+| ESA WorldCover | Land-cover composition | Planetary Computer, keyless |
+| JRC Global Surface Water | Historical water extent (1984–2021) | Planetary Computer, keyless |
+| ISRIC SoilGrids 2.0 | Soil type, texture, pH, carbon, nitrogen, CEC, plant-available water | ISRIC WCS, keyless |
+| Open-Meteo / ERA5 / GloFAS | Weather, 16-day forecast, ET₀, soil moisture, 25-year rainfall anomaly, river flow | Open-Meteo, keyless |
+| SMAP, GRACE-FO, SWOT, ECOSTRESS, NISAR | Satellite soil moisture, groundwater, reservoir volume, evaporative stress | Not connected yet: need a NASA Earthdata token |
+| iSDAsoil | 30 m African soil nutrients | Not connected yet: needs an iSDA account |
+
+Results appear on the Crop, Precision Farming, Soil, Water, Drought, Early Warning and Food Security pages, and the report generator includes the full assessment, priority findings, actions per audience, sources, and an LSTM forecast trained on the site's real Sentinel-2 NDVI.
 
 ## Security notes
 

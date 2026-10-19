@@ -113,6 +113,7 @@ function enterApp(session, { remember = true, action = null } = {}) {
 function doLogout() {
   logActivity('logout', 'User logged out');
   clearSession();
+  try { localStorage.removeItem('wafeo.lastAnalysis'); } catch (e) {}
   try { if (window.google && google.accounts && google.accounts.id) google.accounts.id.disableAutoSelect(); } catch (e) {}
   // A reload gives the next user a clean slate (map, charts, caches).
   setTimeout(() => window.location.reload(), 150);
@@ -1421,152 +1422,14 @@ document.querySelector('[data-page="site-intelligence"]').addEventListener('clic
   }, 100);
 });
 
-async function analyzeRegion(query) {
-  const scanOverlay = document.getElementById('siScanOverlay');
-  scanOverlay.style.opacity = '1';
-  document.querySelector('.si-scanner-line').style.animationPlayState = 'running';
-  
-  let targetLat, targetLon, siteName, siteMeta;
-
-  try {
-    // 1. Resolve Location via OpenStreetMap (Nominatim API)
-    if (typeof query === 'string') {
-      // Hardcoded Chivaraidze check for extremely specific requested local details
-      if (query.toLowerCase().includes('chivaraidze')) {
-         targetLat = -17.8; targetLon = 31.3;
-         siteName = "Chivaraidze Agro-Industrial Park";
-         siteMeta = "Goromonzi, Mashonaland East, Zimbabwe · Granite-derived Sandy Loam";
-      } else {
-         const geoRes = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=1`);
-         const geoData = await geoRes.json();
-         if (geoData && geoData.length > 0) {
-           targetLat = parseFloat(geoData[0].lat);
-           targetLon = parseFloat(geoData[0].lon);
-           siteName = geoData[0].name || query;
-           siteMeta = geoData[0].display_name;
-         } else {
-           throw new Error("Location not found on global registry.");
-         }
-      }
-    } else {
-      // Clicked Coordinate Reverse Geocoding
-      targetLat = query.lat; targetLon = query.lon;
-      const geoRes = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${targetLat}&lon=${targetLon}&format=json`);
-      const geoData = await geoRes.json();
-      siteName = geoData.name || (geoData.address ? geoData.address.village || geoData.address.town || geoData.address.city || geoData.address.county : "Unknown Farm / Region");
-      siteMeta = geoData.display_name || `Lat: ${targetLat.toFixed(4)}, Lon: ${targetLon.toFixed(4)}`;
-    }
-
-    // Fly map to location
-    if (siMap) {
-      siMap.flyTo([targetLat, targetLon], 14, { duration: 1.5 });
-      if (siMarker) siMarker.remove();
-      siMarker = L.circleMarker([targetLat, targetLon], { radius: 12, fillColor: 'var(--accent-emerald)', color: '#fff', weight: 3, opacity: 1, fillOpacity: 0.8 }).addTo(siMap);
-    }
-
-    // 2. Fetch Live Climate/Weather from Open-Meteo. If the service is down we
-    // say so rather than showing made-up "live" values.
-    let weather = null;
-    try {
-      const weatherRes = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${targetLat}&longitude=${targetLon}&current_weather=true&daily=temperature_2m_max,precipitation_sum&timezone=auto`, { signal: AbortSignal.timeout(12000) });
-      if (weatherRes.ok) {
-        const w = await weatherRes.json();
-        if (w.current_weather && w.daily && w.daily.precipitation_sum) {
-          weather = { temp: w.current_weather.temperature, precip: w.daily.precipitation_sum[0] ?? 0 };
-        }
-      }
-    } catch (e) {
-      console.warn('Open-Meteo unavailable:', e.message);
-    }
-
-    const currentTemp = weather ? weather.temp : null;
-    const precipSum = weather ? weather.precip : null;
-    const isDry = !!weather && precipSum < 2 && currentTemp > 30;
-
-    // Weather-based vegetation estimate (not a satellite reading). Deterministic
-    // per location so the same place always gets the same value.
-    const coordSeed = Math.abs(Math.sin(targetLat * 12.9898 + targetLon * 78.233)) % 1;
-    let ndviBase = 0.55 + (coordSeed - 0.5) * 0.12;
-    if (weather) {
-      if (isDry) ndviBase -= 0.25;
-      else if (precipSum > 5) ndviBase += 0.08;
-      if (currentTemp > 35) ndviBase -= 0.08;
-    }
-    const ndviEstimate = Math.min(0.9, Math.max(0.1, ndviBase)).toFixed(2);
-    const ndviLow = parseFloat(ndviEstimate) < 0.4;
-    const weatherNote = 'Live weather is temporarily unavailable from Open-Meteo.';
-
-    // Construct Dynamic Overview
-    let overview = [
-      { id: 'farming', title: 'Farming Infrastructure', icon: siSvgs.farming, badge: 'Optimal', badgeClass: 'optimal', desc: `Region supports active agricultural infrastructure. Thermal scanning shows normal utilization levels.` },
-      { id: 'water', title: 'Water Hydrology', icon: siSvgs.water, badge: !weather ? 'No data' : isDry ? 'Concern' : 'Optimal', badgeClass: !weather ? 'watch' : isDry ? 'concern' : 'optimal', desc: weather ? `Live precipitation today: ${precipSum} mm. ${isDry ? 'Severe stress on local irrigation.' : 'Water flow and local irrigation networks are stable.'}` : weatherNote },
-      { id: 'agriculture', title: 'Agriculture & Vegetation', icon: siSvgs.agriculture, badge: ndviLow ? 'Watch' : 'Optimal', badgeClass: ndviLow ? 'watch' : 'optimal', desc: `Weather-based vegetation estimate (NDVI): ${ndviEstimate}. ${ndviLow ? 'Crops likely under stress.' : 'Vegetation likely healthy.'} Open Crop Monitoring for satellite NDVI.` },
-      { id: 'climate', title: 'Climate & Heat', icon: siSvgs.climate, badge: !weather ? 'No data' : currentTemp > 32 ? 'Concern' : 'Watch', badgeClass: !weather ? 'watch' : currentTemp > 32 ? 'concern' : 'watch', desc: weather ? `Live air temperature: ${currentTemp} °C. ${currentTemp > 32 ? 'Extreme heat detected.' : 'Normal seasonal thermal signature.'}` : weatherNote },
-      { id: 'foodSec', title: 'Food Security Alert', icon: siSvgs.foodSec, badge: isDry ? 'Concern' : 'Watch', badgeClass: isDry ? 'concern' : 'watch', desc: `Region IPC phase estimated from local weather. ${isDry ? 'High risk of yield reduction.' : 'Stable local market forecast.'}` }
-    ];
-
-    let evidence = [
-      { title: 'Vegetation Shift (30d)', trend: ndviLow ? 'negative' : 'positive', desc: `Vegetation likely trending ${ndviLow ? 'downward' : 'upward'} given recent weather patterns.` },
-      { title: 'Hydrology Change (7d)', trend: isDry ? 'negative' : 'positive', desc: weather ? `Today's precipitation of ${precipSum} mm points to ${isDry ? 'falling' : 'steady'} soil moisture.` : weatherNote }
-    ];
-
-    // Restore Chivaraidze specifics if searched
-    if (typeof query === 'string' && query.toLowerCase().includes('chivaraidze')) {
-        overview[0].desc = 'Multi-enterprise farming operational: Milling plants, Abattoirs, and Freeze drying facilities active.';
-        overview[1].desc = `${weather ? `Live precipitation: ${precipSum} mm.` : weatherNote} Permanent water is adjacent. SAZ certified water plant fully operational and scaling.`;
-        overview[2].desc = `Vegetation is robust (NDVI ${ndviEstimate}). Crops: Maize, Wheat, Soya, Pawpaw, Macadamia. Livestock: 300 cattle, 600 goats.`;
-        evidence = [
-          { title: 'Vegetation & ecosystem', trend: 'positive', desc: 'NDVI improved by +0.04 (12%) due to recent implementation of multi-enterprise horticulture.' },
-          { title: 'Water & hydrology', trend: 'positive', desc: 'Water network connection remains stable. New SAZ certified water plant operational.' },
-          { title: 'Land use & cover', trend: 'positive', desc: 'Built infrastructure increased by 5% due to completion of the new milling and oil production facilities.' }
-        ];
-    }
-
-    // Update UI
-    document.getElementById('siSiteName').textContent = siteName;
-    document.getElementById('siSiteMeta').textContent = siteMeta;
-
-    document.getElementById('siMetricsGrid').innerHTML = overview.map(m => `
-      <div class="si-card">
-        <div class="si-card-hdr">
-          <div class="si-card-title">${m.icon} ${m.title}</div>
-          <span class="si-badge ${m.badgeClass}">${m.badge}</span>
-        </div>
-        <div class="si-card-desc">${m.desc}</div>
-      </div>
-    `).join('');
-
-    document.getElementById('siCompareList').innerHTML = evidence.map(c => `
-      <div class="si-compare-item ${c.trend}">
-        <div class="si-compare-title">${c.title}</div>
-        <div class="si-compare-desc">${c.desc}</div>
-      </div>
-    `).join('');
-
-    document.getElementById('siRegList').innerHTML = `
-      <div class="si-reg-item">
-        <div class="si-card-desc" style="margin-bottom:8px;font-style:italic">Illustrative example. Regulatory datasets are not yet connected for this location.</div>
-      <div class="si-reg-title"><span>Water Use Compliance</span> <span class="si-reg-status compliant">Compliant</span></div>
-        <div class="si-card-desc">Irrigation extraction aligns with regional water quotas.</div>
-      </div>
-      <div class="si-reg-item">
-        <div class="si-reg-title"><span>Deforestation Policy</span> <span class="si-reg-status warning">Warning</span></div>
-        <div class="si-card-desc">Proximity to protected biodiversity area. Monitoring active.</div>
-      </div>
-    `;
-
-    setTimeout(() => {
-      scanOverlay.style.opacity = '0';
-    }, 1000);
-
-  } catch (error) {
-    console.error("Site Intelligence API Error:", error);
-    document.getElementById('siSiteName').textContent = "Analysis Failed";
-    document.getElementById('siSiteMeta').textContent = error.message;
-    scanOverlay.style.opacity = '0';
-  }
+// Site analysis runs on live satellite, soil and weather data (see eo.js).
+function analyzeRegion(query) {
+  // Chivaraidze Agro-Industrial Park is not in OpenStreetMap: use its location.
+  if (typeof query === 'string' && /chivaraidze/i.test(query)) query = { lat: -17.8, lon: 31.3, run: true };
+  if (!window.wafeoSite) return;
+  if (query && query.run) { window.wafeoSite.analyze(query).then(() => window.wafeoSite.run()); return; }
+  window.wafeoSite.analyze(query);
 }
-
 
 function toggleTheme() {
   document.documentElement.classList.toggle('dark-theme');
@@ -1825,28 +1688,93 @@ const WAFEO_FC = (function () {
     lastResult = { region: document.getElementById('fcRegion').value, curAvg, prevAvg, yoy, fcAvg, fcChange, peak: hist.labels[peakIdx], method, forecast: fc.values };
   }
 
+  // Real Sentinel-2 monthly NDVI for the analysed site; cloudy months are
+  // filled by linear interpolation between neighbouring months.
+  function seriesToHist(series) {
+    const labels = series.map(s => { const [y, m] = s.month.split('-'); return MONTHS[Number(m) - 1] + " '" + y.slice(2); });
+    const raw = series.map(s => (Number.isFinite(s.ndvi) ? s.ndvi : null));
+    const known = raw.map((v, i) => [i, v]).filter(([, v]) => v !== null);
+    if (known.length < 6) throw new Error('Too few clear months of imagery for this site.');
+    const values = raw.map((v, i) => {
+      if (v !== null) return v;
+      const before = [...known].reverse().find(([j]) => j < i), after = known.find(([j]) => j > i);
+      if (!before) return after[1];
+      if (!after) return before[1];
+      return +(before[1] + (after[1] - before[1]) * ((i - before[0]) / (after[0] - before[0]))).toFixed(3);
+    });
+    return { labels, values, clearMonths: known.length };
+  }
+
+  // Offer the analysed site as the first, default choice.
+  function syncSiteOption() {
+    const sel = document.getElementById('fcRegion');
+    const name = window.wafeoSite && window.wafeoSite.siteName();
+    if (!sel || !name) return false;
+    let opt = sel.querySelector('option[value="__site"]');
+    const fresh = !opt;
+    if (!opt) { opt = document.createElement('option'); opt.value = '__site'; sel.insertBefore(opt, sel.firstChild); }
+    opt.textContent = `📡 ${name} (live Sentinel-2)`;
+    if (fresh) sel.value = '__site';
+    return true;
+  }
+
   async function run() {
-    const region = (document.getElementById('fcRegion') || {}).value || 'Sahel';
+    const sel = document.getElementById('fcRegion');
+    const region = (sel || {}).value || 'Sahel';
     const btn = document.getElementById('btnRunForecast');
     const status = document.getElementById('fcStatus');
     const badge = document.getElementById('fcBadge');
     if (btn) { btn.disabled = true; btn.textContent = '⏳ Training LSTM…'; }
+    let hist, note, live = false;
+    try {
+      if (region === '__site' && window.wafeoSite && window.wafeoSite.last()) {
+        if (status) status.textContent = 'Loading 24 months of Sentinel-2 NDVI for the selected site…';
+        const s = await window.wafeoSite.ndviSeries();
+        hist = seriesToHist(s.series);
+        live = true;
+        note = `Sentinel-2 monthly NDVI · ${hist.clearMonths} of 24 months had clear imagery`;
+      } else {
+        hist = buildSeries(region);
+        note = 'Illustrative simulated series for this region. Analyse a farm or region in Site Intelligence for real Sentinel-2 data.';
+      }
+    } catch (e) {
+      if (status) status.textContent = e.message;
+      if (btn) { btn.disabled = false; btn.textContent = '▶ Run LSTM Forecast'; }
+      return lastResult;
+    }
     if (status) status.textContent = 'Training neural network on 24 months of NDVI…';
-    const hist = buildSeries(region);
     render(hist, { values: [] });            // show history immediately
     const fc = await lstmForecast(hist.values, 6);
     render(hist, fc);
     renderComparison(hist, fc, fc.method);
-    if (badge) badge.textContent = fc.method.startsWith('LSTM') ? 'LSTM · live' : 'Trend · live';
-    if (status) status.textContent = 'Model: ' + fc.method;
+    lastResult.live = live;
+    lastResult.source = note;
+    if (live) lastResult.region = window.wafeoSite.siteName();
+    if (badge) {
+      badge.textContent = live ? (fc.method.startsWith('LSTM') ? 'Sentinel-2 · LSTM' : 'Sentinel-2 · trend') : 'Illustrative';
+      badge.style.background = live ? 'var(--accent-emerald)' : '#9ca3af';
+    }
+    if (status) status.textContent = `Model: ${fc.method} · ${note}`;
     if (btn) { btn.disabled = false; btn.textContent = '▶ Run LSTM Forecast'; }
     return lastResult;
+  }
+
+  // Used by the report: forecast the analysed site when there is one.
+  async function runForReport() {
+    ensureInit();
+    if (syncSiteOption()) {
+      const sel = document.getElementById('fcRegion');
+      sel.value = '__site';
+      if (!(lastResult && lastResult.live && lastResult.region === window.wafeoSite.siteName())) return run();
+    }
+    return lastResult || run();
   }
 
   function ensureInit() {
     if (initialized) return;
     const panel = document.getElementById('forecastPanel'); if (!panel) return;
     initialized = true;
+    syncSiteOption();
     const btn = document.getElementById('btnRunForecast');
     const sel = document.getElementById('fcRegion');
     if (btn) btn.addEventListener('click', run);
@@ -1854,7 +1782,9 @@ const WAFEO_FC = (function () {
     setTimeout(run, 200); // auto-run on first view
   }
 
-  return { ensureInit, run, getLast: () => lastResult };
+  document.addEventListener('wafeo:analysis', () => { if (initialized && syncSiteOption()) { document.getElementById('fcRegion').value = '__site'; run(); } });
+
+  return { ensureInit, run, runForReport, getLast: () => lastResult };
 })();
 
 // Initialise the forecast panel when the Reports page is opened.
@@ -1870,6 +1800,17 @@ function templateSummary(region, m) {
   return `Vegetation conditions across ${region} show a current 12-month average NDVI of ${m.curAvg != null ? m.curAvg.toFixed(3) : 'n/a'}, with a year-over-year change of ${m.yoy != null ? m.yoy.toFixed(1) + '%' : 'n/a'}. The LSTM forecast projects an average NDVI of ${m.fcAvg != null ? m.fcAvg.toFixed(3) : 'n/a'} over the next six months (${dir} trend). Peak vegetation typically occurs around ${m.peak || 'the main rainy season'}. Continued monitoring of water resources and food-security indicators is recommended, particularly where the trend is declining.`;
 }
 
+// Written summary used when the AI assistant is unavailable.
+function siteOrTemplateSummary(site, region, m) {
+  if (!site) return templateSummary(region, m);
+  const d = site.domains, name = window.wafeoSite.siteName();
+  const parts = [`${site.overall.riskLevel} risk for ${name} (${site.aoi.areaHa.toLocaleString()} ha). ${site.overall.headline}`];
+  for (const k of ['crop', 'waterQuantity', 'waterQuality', 'soil']) if (d[k] && d[k].summary) parts.push(d[k].summary);
+  const r = site.recommendations;
+  parts.push(`Priority for farmers: ${r.farmers[0].action} Priority for government: ${r.government[0].action} Priority for the public: ${r.public[0].action}`);
+  return parts.join('\n\n');
+}
+
 async function generateWafeoReport() {
   const modal = document.getElementById('wafeoReportModal');
   const body = document.getElementById('reportBody');
@@ -1878,42 +1819,49 @@ async function generateWafeoReport() {
   if (!modal || !body) return;
   if (btn) { btn.style.opacity = '0.7'; btn.disabled = true; }
 
-  // Ensure we have forecast metrics to report on.
-  let fc = WAFEO_FC.getLast();
-  if (!fc) { WAFEO_FC.ensureInit(); fc = await WAFEO_FC.run(); }
+  // Forecast the analysed site from real Sentinel-2 NDVI when there is one.
+  let fc = await WAFEO_FC.runForReport().catch(() => WAFEO_FC.getLast());
   const m = fc || {};
   const region = m.region || 'Global';
   const now = new Date();
   const who = (typeof currentUser !== 'undefined' && currentUser && (currentUser.name || currentUser.username)) || 'WAFEO user';
-  if (meta) meta.innerHTML = `Region: <strong>${region}</strong> &middot; Generated: ${now.toLocaleString()} &middot; By: ${who}`;
+  const siteNow = window.wafeoSite && window.wafeoSite.last();
+  const siteName = siteNow && siteNow.data.place ? [siteNow.data.place.name, siteNow.data.place.country].filter(Boolean).join(', ') : null;
+  if (meta) meta.innerHTML = `${siteName ? `Site: <strong>${escapeHtml(siteName)}</strong> &middot; ` : ''}Region: <strong>${region}</strong> &middot; Generated: ${now.toLocaleString()} &middot; By: ${escapeHtml(who)}`;
 
   const fmtPct = n => (n >= 0 ? '+' : '') + (n != null ? n.toFixed(1) : '0.0') + '%';
   const metricsHtml = `
-    <h4>Key Indicators — ${region}</h4>
+    <h4>NDVI Trend &amp; 6-Month Forecast — ${escapeHtml(region)}${m.live ? '' : ' (illustrative)'}</h4>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:8px 0 16px;">
       <div class="fc-card"><div class="fc-label">Current NDVI (12-mo)</div><div class="fc-value fc-neutral">${m.curAvg != null ? m.curAvg.toFixed(3) : '—'}</div></div>
       <div class="fc-card"><div class="fc-label">Year-over-year</div><div class="fc-value ${m.yoy >= 0 ? 'fc-up' : 'fc-down'}">${m.yoy != null ? fmtPct(m.yoy) : '—'}</div></div>
       <div class="fc-card"><div class="fc-label">6-mo Forecast (LSTM)</div><div class="fc-value fc-neutral">${m.fcAvg != null ? m.fcAvg.toFixed(3) : '—'}</div></div>
       <div class="fc-card"><div class="fc-label">Forecast trend</div><div class="fc-value ${m.fcChange >= 0 ? 'fc-up' : 'fc-down'}">${m.fcChange != null ? fmtPct(m.fcChange) : '—'}</div></div>
     </div>
-    <p style="font-size:11px;color:var(--text-muted);">Forecast method: ${m.method || 'LSTM neural network'}. Peak vegetation: ${m.peak || 'n/a'}.</p>`;
+    <p style="font-size:11px;color:var(--text-muted);">Forecast method: ${m.method || 'LSTM neural network'}. Peak vegetation: ${m.peak || 'n/a'}. Data: ${escapeHtml(m.source || 'n/a')}</p>`;
 
-  body.innerHTML = metricsHtml + '<h4>Executive Summary</h4><div class="report-narrative" id="reportNarrative"><em>Generating AI summary…</em></div>';
+  const site = window.wafeoSite && window.wafeoSite.last();
+  const siteHtml = site ? window.wafeoSite.reportHtml() : '<p style="font-size:12px;color:var(--text-muted)">Tip: analyse a farm or region in <b>Site Intelligence</b> first to add live satellite findings on crops, water quantity and quality, soil and guidance to this report.</p>';
+  body.innerHTML = '<h4>Executive Summary</h4><div class="report-narrative" id="reportNarrative"><em>Generating AI summary…</em></div>' + siteHtml + metricsHtml;
   modal.style.display = 'flex';
   if (btn) { btn.style.opacity = '1'; btn.disabled = false; }
 
   const narrEl = document.getElementById('reportNarrative');
-  const prompt = `Write a concise professional executive summary (about 150 words) for an Earth-observation report on ${region}. Data: current 12-month average NDVI ${m.curAvg != null ? m.curAvg.toFixed(3) : 'n/a'}, year-over-year change ${m.yoy != null ? m.yoy.toFixed(1) + '%' : 'n/a'}, 6-month forecast average NDVI ${m.fcAvg != null ? m.fcAvg.toFixed(3) : 'n/a'} (${m.fcChange != null ? m.fcChange.toFixed(1) + '%' : 'n/a'} vs current), peak vegetation around ${m.peak || 'n/a'}. Cover vegetation health, likely water and food-security implications, and one clear recommendation. Plain paragraphs, no headings.`;
+  const prompt = `Write a concise professional executive summary (about 150 words) for an Earth-observation report on ${region}. Data: current 12-month average NDVI ${m.curAvg != null ? m.curAvg.toFixed(3) : 'n/a'}, year-over-year change ${m.yoy != null ? m.yoy.toFixed(1) + '%' : 'n/a'}, 6-month forecast average NDVI ${m.fcAvg != null ? m.fcAvg.toFixed(3) : 'n/a'} (${m.fcChange != null ? m.fcChange.toFixed(1) + '%' : 'n/a'} vs current), peak vegetation around ${m.peak || 'n/a'}. Cover vegetation health, likely water and food-security implications, and one clear recommendation. Plain paragraphs, no headings.`
+    + (site ? ` Focus mainly on this live satellite assessment of the selected area, and give separate one-line priorities for farmers, government and the public: ${window.wafeoSite.reportPromptContext()}` : '');
   let text;
   try {
     const r = await fetch(API + '/ai/chat', { method: 'POST', headers: authHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify({ messages: [{ role: 'user', content: prompt }] }) });
     const d = await r.json().catch(() => ({}));
-    text = d.reply || templateSummary(region, m);
+    text = r.ok && d.reply ? d.reply : siteOrTemplateSummary(site, region, m);
   } catch (e) {
-    text = templateSummary(region, m);
+    text = siteOrTemplateSummary(site, region, m);
   }
   if (narrEl) narrEl.innerHTML = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>');
-  window.__lastReport = { title: `WAFEO Report — ${region}`, region, summary: text, metrics: m, sections: ['NDVI', 'LSTM Forecast', 'Comparison'] };
+  const siteData = site ? window.wafeoSite.reportData() : null;
+  window.__lastReport = siteData
+    ? { title: `WAFEO Site Report — ${siteData.region}`, region: siteData.region, summary: text, metrics: { ...siteData.metrics, forecast: m }, sections: siteData.sections }
+    : { title: `WAFEO Report — ${region}`, region, summary: text, metrics: m, sections: ['NDVI', 'LSTM Forecast', 'Comparison'] };
   loadSavedReports();
 }
 

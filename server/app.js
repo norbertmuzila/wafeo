@@ -49,6 +49,7 @@ app.use('/api', (req, res, next) => config.jwtSecret ? next() : res.status(503).
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api', require('./routes/data'));
 app.use('/api', require('./routes/platform'));
+app.use('/api', require('./routes/eo'));
 
 app.use('/api', (req, res) => res.status(404).json({ error: 'Not found' }));
 app.use('/api', (err, req, res, next) => {
@@ -61,7 +62,7 @@ app.use('/api', (err, req, res, next) => {
 // Only the public files are served. The rest of the project
 // (server code, .env, users.json) must never be downloadable.
 const sendFile = file => (req, res) => res.sendFile(path.join(ROOT, file));
-const PUBLIC_FILES = ['/app.js', '/style.css', '/landing.js', '/landing.css', '/privacy.html'];
+const PUBLIC_FILES = ['/app.js', '/style.css', '/landing.js', '/landing.css', '/privacy.html', '/eo.js'];
 app.get(PUBLIC_FILES, (req, res) => res.sendFile(path.join(ROOT, req.path)));
 app.get('/privacy', sendFile('privacy.html'));
 app.use('/assets', express.static(path.join(ROOT, 'assets')));

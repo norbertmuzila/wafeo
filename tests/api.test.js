@@ -127,6 +127,16 @@ test('admin routes are admin-only; role change works', async () => {
   assert.strictEqual(r.json.user.role, 'policy');
 });
 
+test('satellite analysis endpoint requires sign-in and validates the area', async () => {
+  assert.strictEqual((await call('POST', '/api/eo/analyze', { body: { point: [31.35, -17.85] } })).status, 401);
+  const token = await login('farmer');
+  const bad = await call('POST', '/api/eo/analyze', { token, body: {} });
+  assert.strictEqual(bad.status, 400);
+  const huge = await call('POST', '/api/eo/analyze', { token, body: { geometry: { type: 'Polygon', coordinates: [[[30, -20], [32, -20], [32, -18], [30, -18], [30, -20]]] } } });
+  assert.strictEqual(huge.status, 400);
+  assert.match(huge.json.error, /km²/);
+});
+
 test('private files are not served', async () => {
   for (const p of ['/data/users.json', '/server.js', '/.env', '/package.json', '/server/config.js']) {
     const r = await call('GET', p);

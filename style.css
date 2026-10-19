@@ -1336,3 +1336,58 @@ body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--bg-deep); c
 .rd-val.positive { color: var(--accent-emerald); }
 .rd-val.warning { color: var(--accent-orange); }
 
+
+/* ═══════════════ LIVE SATELLITE SITE ANALYSIS (eo.js) ═══════════════ */
+.eo-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; padding-top: 4px; }
+.eo-seg { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.eo-seg-btn { background: #fff; border: 0; padding: 8px 12px; font: inherit; font-size: 13px; cursor: pointer; color: var(--text-muted); }
+.eo-seg-btn + .eo-seg-btn { border-left: 1px solid var(--border); }
+.eo-seg-btn.active { background: var(--accent-blue); color: #fff; }
+.eo-radius { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-muted); }
+.eo-radius select { padding: 7px 10px; border: 1px solid var(--border); border-radius: 8px; font: inherit; font-size: 13px; background: #fff; }
+.eo-draw-actions { display: inline-flex; gap: 6px; }
+.eo-btn { background: #3F8F3A; color: #fff; border: 0; border-radius: 8px; padding: 9px 16px; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+.eo-btn:hover { background: #347a30; }
+.eo-btn:disabled { opacity: 0.6; cursor: progress; }
+.eo-btn-ghost { background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 7px 12px; font: inherit; font-size: 12px; cursor: pointer; color: var(--text-dark); }
+.eo-hint { font-size: 12px; color: var(--text-muted); flex: 1 1 260px; }
+.eo-hint-error { color: #b91c1c; font-weight: 600; }
+.si-badge.neutral { background: #eef1f4; color: #4b5563; }
+.eo-overall { border-left: 4px solid #3F8F3A; }
+.eo-overall.eo-watch { border-left-color: #E8A33A; }
+.eo-overall.eo-concern { border-left-color: #C9463D; }
+.eo-headline { font-size: 14px; font-weight: 600; color: var(--text-dark); line-height: 1.5; }
+.eo-score { display: flex; align-items: center; gap: 10px; font-size: 12px; }
+.eo-score-bar { flex: 1; height: 6px; border-radius: 6px; background: #eef1f4; overflow: hidden; }
+.eo-score-bar i { display: block; height: 100%; background: linear-gradient(90deg, #C9463D, #E8A33A 50%, #3F8F3A); }
+.eo-kv { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 12px; margin-top: 4px; }
+.eo-kv div { display: flex; flex-direction: column; font-size: 11px; color: var(--text-muted); min-width: 0; }
+.eo-kv b { font-size: 13px; color: var(--text-dark); overflow-wrap: anywhere; }
+.eo-h4 { margin: 18px 0 8px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--accent-blue); }
+.eo-h4:first-child { margin-top: 0; }
+.eo-evidence { margin-top: 4px; font-size: 11px; color: var(--text-muted); font-style: italic; }
+.eo-details { border: 1px solid var(--border); border-radius: 8px; margin-bottom: 8px; }
+.eo-details summary { padding: 8px 12px; font-weight: 600; font-size: 13px; cursor: pointer; }
+.eo-table-wrap { overflow-x: auto; }
+.eo-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.eo-table td, .eo-table th { padding: 6px 12px; border-top: 1px solid var(--border); text-align: left; vertical-align: top; }
+.eo-table td:last-child { font-weight: 600; color: var(--text-dark); }
+.eo-table th { font-size: 11px; color: var(--text-muted); font-weight: 600; }
+.eo-guide + .eo-guide { margin-top: 6px; }
+.eo-actions { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 10px; }
+.eo-action { font-size: 13px; color: var(--text-dark); line-height: 1.5; }
+.eo-why { font-size: 11.5px; color: var(--text-muted); margin-top: 2px; }
+.eo-note { font-size: 11.5px; color: var(--text-muted); margin-top: 14px; font-style: italic; }
+.eo-sources .si-reg-item { margin-bottom: 8px; }
+.eo-context { margin-bottom: 16px; padding: 14px 16px; }
+.eo-context-hdr { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 16px; font-size: 13px; color: var(--text-dark); margin-bottom: 10px; }
+.eo-context-meta { font-size: 12px; color: var(--text-muted); }
+.eo-context a { color: var(--accent-blue); font-weight: 600; }
+.eo-context-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+.eo-context-empty { font-size: 13px; color: var(--text-muted); }
+.eo-issue-list { margin: 10px 0 0; padding-left: 18px; font-size: 12.5px; line-height: 1.6; color: var(--text-dark); }
+@media (max-width: 900px) {
+  #pg-site-intelligence .si-content-area { flex-direction: column; }
+  #pg-site-intelligence .si-map-panel { min-height: 360px; }
+  #pg-site-intelligence .si-data-panel { width: 100% !important; }
+}
