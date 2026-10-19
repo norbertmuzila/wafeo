@@ -133,5 +133,7 @@ test('private files are not served', async () => {
     assert.ok(!/"password":\s*"/.test(r.text) && !r.text.includes('module.exports') && !r.text.includes('"dependencies"'), p + ' leaked');
   }
   assert.strictEqual((await call('GET', '/data/stats.json')).status, 200);
+  const privacy = await call('GET', '/privacy');
+  assert.ok(privacy.status === 200 && privacy.text.includes('Privacy Policy'), 'privacy page served');
   assert.ok([401, 404].includes((await call('GET', '/api/seed?secret=wafeo-admin-seed-2024')).status), 'seed route removed');
 });
