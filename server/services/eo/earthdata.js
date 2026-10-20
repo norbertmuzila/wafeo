@@ -179,9 +179,20 @@ function parseDapCsv(text) {
 async function smapDay(g, { row, col }) {
   const od = (g.urls.find(u => /OPENDAP/i.test(u.subtype)) || {}).url;
   if (!od) return null;
-  const ce = `/Soil_Moisture_Retrieval_Data_AM/soil_moisture[${row}][${col}];/Soil_Moisture_Retrieval_Data_PM/soil_moisture_pm[${row}][${col}]`;
+  // OPeNDAP returns no value for a single-cell subset, so read the 3 × 3
+  // block around the cell and use its centre (or the valid neighbours' mean).
+  const win = `[${row - 1}:1:${row + 1}][${col - 1}:1:${col + 1}]`;
+  const ce = `/Soil_Moisture_Retrieval_Data_AM/soil_moisture${win};/Soil_Moisture_Retrieval_Data_PM/soil_moisture_pm${win}`;
   const res = await authFetch(`${od}.dap.csv?dap4.ce=${encodeURIComponent(ce)}`, { timeout: 25000 });
-  const vals = Object.values(parseDapCsv(await res.text())).flat().filter(v => v >= 0 && v <= 1);
+  const table = parseDapCsv(await res.text());
+  const ok = v => Number.isFinite(v) && v >= 0 && v <= 1;
+  const vals = [];
+  for (const pass of ['soil_moisture[', 'soil_moisture_pm[']) {
+    const rows = Object.keys(table).filter(k => k.includes('/' + pass)).sort().map(k => table[k]);
+    const centre = rows[1] && rows[1][1];
+    if (ok(centre)) vals.push(centre);
+    else { const around = rows.flat().filter(ok); if (around.length) vals.push(around.reduce((a, b) => a + b, 0) / around.length); }
+  }
   if (!vals.length) return null;
   return { date: (g.start || '').slice(0, 10), sm: vals.reduce((a, b) => a + b, 0) / vals.length };
 }
