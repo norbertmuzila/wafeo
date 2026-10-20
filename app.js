@@ -365,106 +365,10 @@ async function loadDashboard() {
   if (window.wafeoLive) window.wafeoLive.dashboard();
 }
 
-// ─── REPORTS PAGE (loads news here) ───
-async function loadReports() {
-  const news = await apiFetch('/news');
-  if (news) renderNewsPanel(news.articles);
+// ─── REPORTS PAGE: live news is handled by livenews.js ───
+function loadReports() {
+  if (window.wafeoNews) window.wafeoNews.start();
 }
-
-let _cachedNews = [];
-
-// ─── NEWS PANEL RENDERER ─────────────────────────────────────
-function renderNewsPanel(articles) {
-  const panel = document.getElementById('newsPanel');
-  if (!panel) return;
-
-  _cachedNews = articles || []; // Store for filtering
-
-  if (!articles || articles.length === 0) {
-    panel.innerHTML = '<div class="panel-hdr"><h3><i data-lucide="newspaper"></i>Live News</h3><span class="panel-badge">No data</span></div><div style="padding:16px;font-size:13px;color:var(--text-muted)">No news articles available right now.</div>';
-    return;
-  }
-
-  const tagColors = {
-    'Food Security': '#e53e3e', 'Agriculture': '#38a169', 'Water': '#3182ce',
-    'Disaster': '#d69e2e', 'Global News': '#003366', 'Financials': '#4a5568',
-    'Development': '#805ad5', 'Research': '#319795', 'Ag-Tech': '#2b6cb0',
-    'Environment': '#276749'
-  };
-
-  const renderItems = (list) => {
-    if (!list || list.length === 0) return '<div style="padding:16px;font-size:13px;color:var(--text-muted)">No matching articles found.</div>';
-    return list.map(a => {
-      const date = a.date?.created ? new Date(a.date.created).toLocaleDateString('en-GB', {day:'numeric', month:'short', year:'numeric'}) : 'Today';
-      const source = a.source && a.source.length > 0 ? a.source[0].name : (a.sourceName || 'Global');
-      const countries = a.country && a.country.length > 0 ? a.country.map(c => c.name).slice(0,3).join(', ') : 'Global';
-      const tc = tagColors[a.tag] || '#3182ce';
-      return `<div class="news-item" style="padding:10px 16px;border-bottom:1px solid var(--border);display:flex;gap:10px;align-items:flex-start">
-        <div style="flex-shrink:0;margin-top:3px"><span style="background:${tc};color:#fff;font-size:9px;padding:2px 7px;border-radius:10px;font-weight:700;white-space:nowrap">${a.tag || 'News'}</span></div>
-        <div style="flex:1;min-width:0">
-          <a href="${a.url || '#'}" target="_blank" rel="noopener" style="font-weight:600;color:var(--text-primary);font-size:13px;text-decoration:none;display:block;margin-bottom:3px;line-height:1.35;transition:color .2s" onmouseover="this.style.color='var(--accent-blue)'" onmouseout="this.style.color='var(--text-primary)'">${a.title}</a>
-          <div style="font-size:10px;color:var(--text-muted)"><i data-lucide="map-pin"></i> ${countries} &nbsp;·&nbsp; <i data-lucide="building-2"></i> ${source} &nbsp;·&nbsp; <i data-lucide="calendar-days"></i> ${date}</div>
-        </div>
-      </div>`;
-    }).join('');
-  };
-
-  panel.innerHTML = `
-    <div class="panel-hdr" style="flex-wrap: wrap; gap: 10px;">
-      <h3 style="flex-shrink: 0;"><i data-lucide="newspaper"></i>Live News — Water, Agriculture &amp; Food Systems</h3>
-      <div class="news-search-box">
-        <input type="text" id="newsQuery" placeholder="Search keywords..." oninput="handleNewsSearch(event)">
-      </div>
-      <span class="panel-badge" id="newsCount" style="background:var(--accent-blue)">${articles.length} Reports</span>
-    </div>
-    <div class="panel-scroll-content" id="newsList">
-      ${renderItems(articles)}
-    </div>
-  `;
-}
-
-function handleNewsSearch(e) {
-  const query = e.target.value.toLowerCase();
-  const filtered = _cachedNews.filter(a => {
-    const title = (a.title || '').toLowerCase();
-    const source = (a.sourceName || (a.source && a.source[0] ? a.source[0].name : '')).toLowerCase();
-    const countries = (a.country ? a.country.map(c => c.name).join(' ') : '').toLowerCase();
-    return title.includes(query) || source.includes(query) || countries.includes(query);
-  });
-
-  const listContainer = document.getElementById('newsList');
-  const countBadge = document.getElementById('newsCount');
-
-  if (listContainer) {
-    // Re-render only the list items to maintain input focus
-    const tagColors = {
-      'Food Security': '#e53e3e', 'Agriculture': '#38a169', 'Water': '#3182ce',
-      'Disaster': '#d69e2e', 'Global News': '#003366', 'Financials': '#4a5568',
-      'Development': '#805ad5', 'Research': '#319795', 'Ag-Tech': '#2b6cb0',
-      'Environment': '#276749'
-    };
-    
-    listContainer.innerHTML = filtered.map(a => {
-      const date = a.date?.created ? new Date(a.date.created).toLocaleDateString('en-GB', {day:'numeric', month:'short', year:'numeric'}) : 'Today';
-      const source = a.source && a.source.length > 0 ? a.source[0].name : (a.sourceName || 'Global');
-      const countries = a.country && a.country.length > 0 ? a.country.map(c => c.name).slice(0,3).join(', ') : 'Global';
-      const tc = tagColors[a.tag] || '#3182ce';
-      return `<div class="news-item" style="padding:10px 16px;border-bottom:1px solid var(--border);display:flex;gap:10px;align-items:flex-start">
-        <div style="flex-shrink:0;margin-top:3px"><span style="background:${tc};color:#fff;font-size:9px;padding:2px 7px;border-radius:10px;font-weight:700;white-space:nowrap">${a.tag || 'News'}</span></div>
-        <div style="flex:1;min-width:0">
-          <a href="${a.url || '#'}" target="_blank" rel="noopener" style="font-weight:600;color:var(--text-primary);font-size:13px;text-decoration:none;display:block;margin-bottom:3px;line-height:1.35;transition:color .2s" onmouseover="this.style.color='var(--accent-blue)'" onmouseout="this.style.color='var(--text-primary)'">${a.title}</a>
-          <div style="font-size:10px;color:var(--text-muted)"><i data-lucide="map-pin"></i> ${countries} &nbsp;·&nbsp; <i data-lucide="building-2"></i> ${source} &nbsp;·&nbsp; <i data-lucide="calendar-days"></i> ${date}</div>
-        </div>
-      </div>`;
-    }).join('') || '<div style="padding:16px;font-size:13px;color:var(--text-muted)">No matching articles found.</div>';
-  }
-
-  if (countBadge) {
-    countBadge.textContent = `${filtered.length} Reports`;
-  }
-}
-
-
 
 const _ts = () => new Date().toISOString().split('T')[0];
 

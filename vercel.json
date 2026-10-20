@@ -46,6 +46,10 @@
       "use": "@vercel/static"
     },
     {
+      "src": "livenews.js",
+      "use": "@vercel/static"
+    },
+    {
       "src": "landing.js",
       "use": "@vercel/static"
     },

@@ -167,3 +167,10 @@ test('field tracing validates the click', async () => {
   const token = await login('farmer');
   assert.strictEqual((await call('GET', '/api/eo/field?lon=abc&lat=1', { token })).status, 400);
 });
+
+test('news rejects invalid dates without calling sources', async () => {
+  const token = await login('farmer');
+  assert.strictEqual((await call('GET', '/api/news?date=2099-01-01', { token })).status, 400);
+  assert.strictEqual((await call('GET', '/api/news?date=yesterday', { token })).status, 400);
+  assert.strictEqual((await call('GET', '/api/news')).status, 401);
+});

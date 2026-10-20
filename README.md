@@ -18,6 +18,7 @@ landing.css, landing.js         Home page: pinned scroll hero, sections, hand-of
 eo.js                           Site Intelligence analysis UI (click a field, point + radius, or draw)
 atlas.js                        Dashboard world map: rotating globe / flat map, 208-country atlas with flags,
                                 country cards (World Bank statistics, hazards), click-to-select a field
+livenews.js                     Live News panel (Reports): auto-refresh, date archive, region and topic filters
 report.js                       PDF report "Analysis_Report_WAFEO_<area>.pdf" (jsPDF)
 pages.js                        Live Dashboard and domain pages (plain + expert views, charts, maps)
 assets/                         Logo, images and countries.json (the 208 countries and territories)
@@ -30,10 +31,10 @@ server/
   store.js                      Data layer: Firestore if configured, else data/*.json
   auth.js                       Password hashing, JWT, auth/role middleware, rate limit
   routes/auth.js                /api/auth/*  login, google, register, demo, me, logout
-  routes/data.js                Dashboard datasets + live news
+  routes/data.js                /api/news (live and by date)
   routes/platform.js            AI assistant, reports, activity log, admin
   routes/eo.js                  /api/eo/analyze, /api/eo/field, /api/eo/ndvi-series, /api/live/hazards
-  services/news.js              ReliefWeb + RSS news aggregator (15-min cache)
+  services/news.js              Verified live news: trusted outlet feeds, Google News and GDELT search, 3-min refresh
   services/eo/                  Satellite analysis engine:
     sentinel2.js                  Sentinel-2 L2A: NDVI/EVI/SAVI, red-edge N, NDMI, BSI, water, NDTI, NDCI, 24-month NDVI
     planetary.js                  Landsat 8/9 LST, Copernicus DEM, ESA WorldCover, JRC Global Surface Water
@@ -105,7 +106,7 @@ All endpoints except health and auth require `Authorization: Bearer <token>`.
 | GET | `/api/eo/field?lon=&lat=` | Traces the field under a map click from the latest clear Sentinel-2 image (10 m): returns its outline polygon and area |
 | POST | `/api/eo/ndvi-series` | 24 months of Sentinel-2 NDVI for the same area |
 | GET | `/api/live/hazards` | Live GDACS hazard alerts (drought, flood, cyclone, volcano, wildfire) |
-| GET | `/api/news?limit=n` | Live news |
+| GET | `/api/news` · `/api/news?date=YYYY-MM-DD` | Verified news on water, agriculture, food security and climate hazards: live (refreshed every 3 minutes) or for any date since 2015 |
 | POST | `/api/ai/chat` | `{ messages: [{ role, content }] }` |
 | GET/POST | `/api/reports` | Saved reports (per user) |
 | GET | `/api/admin/users`, `/api/admin/activity` | Admin only |

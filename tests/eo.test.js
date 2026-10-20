@@ -101,3 +101,26 @@ test('field outline: grows a field, fills holes, traces and simplifies', () => {
   const xs = ring.map(p => p[0]), ys = ring.map(p => p[1]);
   assert.deepStrictEqual([Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)], [5, 15, 6, 14]);
 });
+
+test('news verification: trusted, on-topic, dated stories only; duplicates merged', () => {
+  const { verify, trustedOf, parseFeed } = require('../server/services/news')._internal;
+  const now = Date.parse('2026-10-20T12:00:00Z');
+  const t = d => trustedOf(d);
+  const raw = [
+    { title: 'Zimbabwe projects cereal shortfall as El Nino looms', url: 'https://www.newsday.co.zw/a', date: '2026-10-20T08:00:00Z', summary: '', trusted: t('newsday.co.zw'), origin: 'feed' },
+    { title: 'Zimbabwe projects big cereal shortfall as El Nino looms', url: 'https://www.herald.co.zw/b', date: '2026-10-20T09:00:00Z', summary: '', trusted: t('herald.co.zw'), origin: 'google' },
+    { title: 'Drought hits farmers across the region badly', url: 'https://random-blog.example/x', date: '2026-10-20T09:00:00Z', summary: '', trusted: t('random-blog.example'), origin: 'gdelt' },
+    { title: 'Premier League football results from the weekend', url: 'https://www.bbc.co.uk/sport/1', date: '2026-10-20T09:00:00Z', summary: '', trusted: t('bbc.co.uk'), origin: 'feed' },
+    { title: 'Floods expected to hit farmland next week say officials', url: 'https://www.reuters.com/c', date: '2026-10-25T09:00:00Z', summary: '', trusted: t('reuters.com'), origin: 'google' },
+    { title: 'Maize harvest falls in Malawi after dry spell', url: 'javascript:alert(1)', date: '2026-10-20T09:00:00Z', summary: '', trusted: t('nyasatimes.com'), origin: 'feed' }
+  ];
+  const { articles, rejected } = verify(raw, { now });
+  assert.strictEqual(articles.length, 1);
+  assert.strictEqual(articles[0].region, 'Zimbabwe');
+  assert.strictEqual(articles[0].corroboration, 2, 'NewsDay and The Herald report the same story');
+  assert.deepStrictEqual(rejected, { untrusted: 1, offTopic: 1, badDate: 1, badUrl: 1 });
+  assert.strictEqual(trustedOf('www.newsday.co.zw').name, 'NewsDay');
+  const items = parseFeed('<rss><channel><item><title><![CDATA[Farmers &amp; rain]]></title><link>https://x.org/1</link><pubDate>Tue, 20 Oct 2026 10:00:00 GMT</pubDate><source url="https://www.reuters.com">Reuters</source></item></channel></rss>');
+  assert.strictEqual(items[0].title, 'Farmers & rain');
+  assert.strictEqual(items[0].sourceName, 'Reuters');
+});
