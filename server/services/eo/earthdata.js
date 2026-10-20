@@ -216,10 +216,21 @@ async function grace(aoi) {
   const hit = graceCache.get(key);
   if (hit && hit.expires > Date.now()) return hit.value;
 
-  const [g] = await cmrGranules(COLLECTIONS.GRACE, { pageSize: 1 });
-  if (!g) return { available: false, reason: 'No GRACE-FO granule found.' };
-  const base = `${OPENDAP}/${COLLECTIONS.GRACE}/granules/${g.id}`;
-  const timeCsv = parseDapCsv(await (await authFetch(`${base}.dap.csv?dap4.ce=${encodeURIComponent('/time')}`, { timeout: 30000 })).text());
+  // Each release is one file holding every month. The newest file can reach
+  // OPeNDAP a few days after CMR, so fall back to the previous release.
+  const granules = await cmrGranules(COLLECTIONS.GRACE, { pageSize: 4 });
+  if (!granules.length) return { available: false, reason: 'No GRACE-FO granule found.' };
+  let base = null, timeCsv = null, lastErr = null;
+  for (const g of granules) {
+    const opendap = g.urls.find(u => /opendap/i.test(u.url) && /^https:/.test(u.url));
+    const candidate = opendap ? opendap.url.replace(/\.(html|dmr(\.xml)?)$/, '') : `${OPENDAP}/${COLLECTIONS.GRACE}/granules/${g.id}`;
+    try {
+      timeCsv = parseDapCsv(await (await authFetch(`${candidate}.dap.csv?dap4.ce=${encodeURIComponent('/time')}`, { timeout: 30000 })).text());
+      base = candidate;
+      break;
+    } catch (err) { lastErr = err; }
+  }
+  if (!base) throw lastErr || new Error('GRACE-FO OPeNDAP unavailable');
   const times = Object.values(timeCsv).flat();
   if (!times.length) throw new Error('GRACE-FO time axis unavailable');
   const ce = `/lwe_thickness[0:1:${times.length - 1}][${latIdx}][${lonIdx}]`;

@@ -5,6 +5,7 @@
 
 const { stacSearch, signedHref, isoDay, daysAgo } = require('./net');
 const { makeGrid, readBand, stats } = require('./raster');
+const { toDataUrl } = require('./png');
 
 const COLLECTION = 'sentinel-2-l2a';
 const CLEAR = new Set([4, 5, 6, 7]);  // SCL: vegetation, bare soil, water, unclassified
@@ -103,8 +104,10 @@ async function analyzeLatest(aoi, now = new Date()) {
 
   const clearPx = land + waterPx;
   const pct = n => (clearPx ? Math.round((n / clearPx) * 1000) / 10 : 0);
+  const images = await fieldPictures(item, aoi, R).catch(err => { console.warn('[s2] field pictures failed:', err.message); return null; });
   const out = {
     available: true,
+    images,
     scene: { ...sceneInfo(pick), resolutionM: Math.round(grid.res) },
     indices: Object.fromEntries(Object.entries(idx).map(([k, v]) => [k, stats(v)])),
     cover: { vegetatedPct: pct(veg), sparsePct: pct(sparse), barePct: pct(bare), waterPct: pct(waterPx), cloudPct: Math.round((cloudy / Math.max(1, cloudy + clearPx)) * 1000) / 10 },
@@ -155,6 +158,73 @@ async function ndviSeries(aoi, months = 24, now = new Date()) {
     }
   }));
   return out;
+}
+
+// Two pictures of the area for reports: true colour (with the surroundings
+// dimmed) and a vegetation-health map coloured by NDVI class.
+const NDVI_CLASSES = [
+  [0.1, [160, 82, 45], 'Bare soil or rock (< 0.1)'],
+  [0.2, [217, 168, 108], 'Very sparse (0.1–0.2)'],
+  [0.3, [242, 223, 122], 'Sparse (0.2–0.3)'],
+  [0.4, [198, 224, 108], 'Moderate (0.3–0.4)'],
+  [0.5, [140, 200, 90], 'Good (0.4–0.5)'],
+  [0.6, [79, 168, 69], 'Healthy (0.5–0.6)'],
+  [0.7, [46, 139, 58], 'Very healthy (0.6–0.7)'],
+  [9, [27, 94, 32], 'Dense, vigorous (≥ 0.7)']
+];
+// The picture frames the field with a margin so its edges and surroundings show.
+async function fieldPictures(item, aoi, R) {
+  const ring = aoi.coordinates[0];
+  const xs = ring.map(p => p[0]), ys = ring.map(p => p[1]);
+  const [x0, x1, y0, y1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
+  const px = (x1 - x0) * 0.18, py = (y1 - y0) * 0.18;
+  const frame = { type: 'Polygon', coordinates: [[[x0 - px, y0 - py], [x1 + px, y0 - py], [x1 + px, y1 + py], [x0 - px, y1 + py], [x0 - px, y0 - py]]] };
+  const grid = makeGrid(frame, epsgOf(item), 10, aoi);
+  const [scl, B02, B03, B04, B08, B11] = await Promise.all(['SCL', 'B02', 'B03', 'B04', 'B08', 'B11'].map(async k => readBand(await sign(item, k), grid, 0)));
+  return fieldImages(grid, scl, { B02, B03, B04, B08, B11 }, R);
+}
+
+function fieldImages(grid, scl, b, R) {
+  const n = grid.width * grid.height;
+  const rgb = new Uint8Array(n * 4), veg = new Uint8Array(n * 4);
+  const tone = v => Math.max(0, Math.min(255, Math.round(255 * Math.pow(Math.max(0, v) * 3.6, 0.8))));
+  const counts = new Array(NDVI_CLASSES.length).fill(0);
+  let water = 0, cloud = 0;
+  for (let i = 0; i < n; i++) {
+    const b2 = R(b.B02[i]), b3 = R(b.B03[i]), b4 = R(b.B04[i]), b8 = R(b.B08[i]), b11 = R(b.B11[i]);
+    const inside = grid.mask[i] === 1;
+    if (Number.isFinite(b2) && Number.isFinite(b3) && Number.isFinite(b4)) {
+      const k = inside ? 1 : 0.45; // dim the surroundings
+      rgb[i * 4] = tone(b4) * k; rgb[i * 4 + 1] = tone(b3) * k; rgb[i * 4 + 2] = tone(b2) * k; rgb[i * 4 + 3] = 255;
+    }
+    if (scl[i] === 0) continue;
+    let c;
+    if (!CLEAR.has(scl[i])) { c = [208, 213, 219]; if (inside) cloud++; }
+    else if (scl[i] === WATER_SCL || (b3 - b11) / (b3 + b11) > 0.2) { c = [58, 134, 200]; if (inside) water++; }
+    else {
+      const ndvi = (b8 - b4) / (b8 + b4);
+      const k = Math.max(0, NDVI_CLASSES.findIndex(([max]) => ndvi < max));
+      c = NDVI_CLASSES[k][1]; if (inside) counts[k]++;
+    }
+    if (!CLEAR.has(scl[i]) && !inside) { /* clouds outside: leave blank */ }
+    else { veg[i * 4] = c[0]; veg[i * 4 + 1] = c[1]; veg[i * 4 + 2] = c[2]; veg[i * 4 + 3] = inside ? 255 : 70; }
+  }
+  // Field outline: dark on the health map, yellow on the natural-colour image.
+  const W = grid.width, H = grid.height, edge = i => { const r = Math.floor(i / W), c = i % W; return [[r - 1, c], [r + 1, c], [r, c - 1], [r, c + 1]].some(([rr, cc]) => rr < 0 || cc < 0 || rr >= H || cc >= W || !grid.mask[rr * W + cc]); };
+  for (let i = 0; i < n; i++) {
+    if (!grid.mask[i] || !edge(i)) continue;
+    veg.set([31, 41, 55, 255], i * 4);
+    rgb.set([255, 213, 79, 255], i * 4);
+  }
+  const total = counts.reduce((a, v) => a + v, 0) + water + cloud;
+  const pctOf = v => (total ? Math.round((v / total) * 1000) / 10 : 0);
+  return {
+    trueColor: toDataUrl(grid.width, grid.height, rgb),
+    ndviMap: toDataUrl(grid.width, grid.height, veg),
+    legend: NDVI_CLASSES.map(([, color, label], k) => ({ label, color, pct: pctOf(counts[k]) }))
+      .concat([{ label: 'Open water', color: [58, 134, 200], pct: pctOf(water) }, { label: 'Cloud or shadow', color: [208, 213, 219], pct: pctOf(cloud) }]),
+    widthPx: grid.width, heightPx: grid.height, pixelM: Math.round(grid.res)
+  };
 }
 
 function sceneInfo(pick) {

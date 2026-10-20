@@ -2,13 +2,29 @@
 
 const express = require('express');
 const { requireAuth, rateLimit } = require('../auth');
+const { traceField } = require('../services/eo/field');
 const { analyzeSite } = require('../services/eo/analyze');
 
 const router = express.Router();
 router.use(requireAuth);
 
 // Each analysis fans out to ~12 data services, so keep it per-user limited.
-const limiter = rateLimit({ windowMs: 60 * 1000, max: 6, key: req => 'eo' + req.user.id });
+const userLimiter = rateLimit({ windowMs: 60 * 1000, max: 6, key: req => 'eo' + req.user.id });
+// Demo sessions are anonymous, so they are also limited per IP address.
+const demoLimiter = rateLimit({ windowMs: 60 * 60 * 1000, max: 30, key: req => 'eo-demo' + req.ip });
+const limiter = (req, res, next) => (req.user.role === 'demo' ? demoLimiter(req, res, () => userLimiter(req, res, next)) : userLimiter(req, res, next));
+const fieldLimiter = rateLimit({ windowMs: 60 * 1000, max: 20, key: req => 'field' + (req.user.role === 'demo' ? req.ip : req.user.id) });
+
+// Click on the map: trace the outline of the field under the click.
+router.get('/eo/field', fieldLimiter, async (req, res) => {
+  try {
+    res.json(await traceField([Number(req.query.lon), Number(req.query.lat)]));
+  } catch (err) {
+    if (err.status) return res.status(err.status).json({ error: err.message });
+    console.error('[eo] field tracing failed:', err);
+    res.status(500).json({ error: 'Could not trace the field. Please try again or draw it instead.' });
+  }
+});
 
 router.post('/eo/analyze', limiter, async (req, res) => {
   try {
@@ -21,7 +37,7 @@ router.post('/eo/analyze', limiter, async (req, res) => {
   }
 });
 
-// 24 months of Sentinel-2 NDVI for the same AOI (feeds the LSTM forecast).
+// 24 months of Sentinel-2 NDVI for the same AOI (season trend charts).
 const { normalizeAoi } = require('../services/eo/geo');
 const { ndviSeries } = require('../services/eo/sentinel2');
 const seriesCache = new Map();

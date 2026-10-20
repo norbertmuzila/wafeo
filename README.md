@@ -3,8 +3,10 @@
 Water, Agriculture & Food systems Earth Observation platform.
 Live: **https://wafeo-webapplication.vercel.app**
 
-Anyone with a Google account can sign in. First-time users get an account
-automatically (role `researcher`). Admins can change roles in **Settings → Registered Users**.
+The home page opens first on every visit. Anyone with a Google account can sign in;
+first-time users get an account automatically (role `researcher`). **Try the demo**
+(next to Sign in / Sign up) opens the whole platform with no account: a 12-hour
+session where nothing is saved. Admins manage roles on the **Users** page.
 
 ---
 
@@ -13,9 +15,12 @@ automatically (role `researcher`). Admins can change roles in **Settings → Reg
 ```
 index.html, style.css, app.js   Frontend (single-page app, no build step)
 landing.css, landing.js         Home page: pinned scroll hero, sections, hand-off to sign-in
-eo.js                           Site Intelligence analysis UI and report integration
+eo.js                           Site Intelligence analysis UI (click a field, point + radius, or draw)
+atlas.js                        Dashboard world map: rotating globe / flat map, 208-country atlas with flags,
+                                country cards (World Bank statistics, hazards), click-to-select a field
+report.js                       PDF report "Analysis_Report_WAFEO_<area>.pdf" (jsPDF)
 pages.js                        Live Dashboard and domain pages (plain + expert views, charts, maps)
-assets/                         Logo and static images (assets/landing/ = home page photo)
+assets/                         Logo, images and countries.json (the 208 countries and territories)
 data/users.json                 Local user store (development only; production uses Firestore)
 server.js                       Local entry point: `npm start`
 api/index.js                    Vercel serverless entry (same app)
@@ -24,10 +29,10 @@ server/
   config.js                     All environment settings in one place
   store.js                      Data layer: Firestore if configured, else data/*.json
   auth.js                       Password hashing, JWT, auth/role middleware, rate limit
-  routes/auth.js                /api/auth/*  login, google, register, me, logout
+  routes/auth.js                /api/auth/*  login, google, register, demo, me, logout
   routes/data.js                Dashboard datasets + live news
   routes/platform.js            AI assistant, reports, activity log, admin
-  routes/eo.js                  /api/eo/analyze and /api/eo/ndvi-series
+  routes/eo.js                  /api/eo/analyze, /api/eo/field, /api/eo/ndvi-series, /api/live/hazards
   services/news.js              ReliefWeb + RSS news aggregator (15-min cache)
   services/eo/                  Satellite analysis engine:
     sentinel2.js                  Sentinel-2 L2A: NDVI/EVI/SAVI, red-edge N, NDMI, BSI, water, NDTI, NDCI, 24-month NDVI
@@ -94,8 +99,10 @@ All endpoints except health and auth require `Authorization: Bearer <token>`.
 | POST | `/api/auth/login` | `{ username, password }` (username or email) |
 | POST | `/api/auth/google` | `{ credential }` Google ID token |
 | POST | `/api/auth/register` | `{ name, email, username, password, region }` |
+| POST | `/api/auth/demo` | No-account demo session (12 h; cannot save or administer; limited per IP) |
 | GET | `/api/auth/me` | Restore session, returns a fresh token |
 | POST | `/api/eo/analyze` | Live satellite, soil, weather, FEWS NET and GDACS analysis of `{ point, radius_m }` or `{ geometry }` |
+| GET | `/api/eo/field?lon=&lat=` | Traces the field under a map click from the latest clear Sentinel-2 image (10 m): returns its outline polygon and area |
 | POST | `/api/eo/ndvi-series` | 24 months of Sentinel-2 NDVI for the same area |
 | GET | `/api/live/hazards` | Live GDACS hazard alerts (drought, flood, cyclone, volcano, wildfire) |
 | GET | `/api/news?limit=n` | Live news |
@@ -106,7 +113,7 @@ All endpoints except health and auth require `Authorization: Bearer <token>`.
 
 ## Live satellite analysis
 
-In **Site Intelligence**, choose a point and radius or draw a farm boundary and press **Analyse with satellites**. The server reads only the pixels inside the area (HTTP range requests on cloud-optimised GeoTIFFs), so a farm costs kilobytes and takes ~5–20 seconds.
+On the **Dashboard** map, zoom in until fields are visible and click inside one: its outline is traced from the newest clear Sentinel-2 image and you can analyse it straight away. **Site Intelligence** offers the same "Click a field" mode, plus point + radius and drawing a boundary. The server reads only the pixels inside the area (HTTP range requests on cloud-optimised GeoTIFFs), so a farm costs kilobytes and takes ~5–20 seconds.
 
 | Source | What it gives | Access |
 |---|---|---|
@@ -124,7 +131,7 @@ In **Site Intelligence**, choose a point and radius or draw a farm boundary and 
 | iSDAsoil (iSDA Africa) | 30 m soil N, P, K, Zn, pH, carbon, texture | iSDA API, needs `ISDA_USERNAME` / `ISDA_PASSWORD` |
 | NISAR (NASA/ISRO) | 200 m radar soil moisture | Not connected: provisional data is only offered as ~130 MB files with no per-area access |
 
-Results appear on the Crop, Precision Farming, Soil, Water, Drought, Early Warning and Food Security pages, and the report generator includes the full assessment, priority findings, actions per audience, sources, and an LSTM forecast trained on the site's real Sentinel-2 NDVI.
+Results appear on the Crop, Precision Farming, Soil, Water, Drought, Early Warning and Food Security pages. **Download PDF report** (on every page's site bar, Site Intelligence and Reports) creates `Analysis_Report_WAFEO_<area>.pdf`: A4, 12 pt justified text in Helvetica (the PDF standard font with Arial's metrics), the colour-analysed field (vegetation-health map and natural-colour image), every reading with its plain meaning, priority findings, two-year greenness chart, 16-day outlook, nearby hazards and actions for farmers, government and the public. It reports results only; data-source names are left out.
 
 ## Security notes
 

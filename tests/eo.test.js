@@ -83,3 +83,21 @@ test('dry season: bare fields are not reported as crop failure', () => {
   assert.ok(!r.issues.some(i => /deficit/i.test(i.title)), 'no drought alarm in dry season');
   assert.match(r.domains.crop.summary, /expected in the dry season/);
 });
+
+test('field outline: grows a field, fills holes, traces and simplifies', () => {
+  const { grow, tidy, outline, simplify } = require('../server/services/eo/field')._internal;
+  // 20 × 20 window: a 10 × 8 "field" (NDVI 0.7) on bare soil (NDVI 0.15), one cloud-free hole.
+  const W = 20, H = 20, N = W * H;
+  const f = { ndvi: new Float32Array(N).fill(0.15), nir: new Float32Array(N).fill(0.2), swir: new Float32Array(N).fill(0.3) };
+  for (let r = 6; r < 14; r++) for (let c = 5; c < 15; c++) { const i = r * W + c; f.ndvi[i] = 0.7; f.nir[i] = 0.4; f.swir[i] = 0.15; }
+  const hole = 9 * W + 9; f.ndvi[hole] = 0.1; f.nir[hole] = 0.2; f.swir[hole] = 0.3;
+  const grid = { width: W, height: H, mask: new Uint8Array(N).fill(1) };
+  const scl = new Uint8Array(N).fill(4);
+  const seed = 10 * W + 10;
+  const field = tidy(grow(grid, f, seed, scl), W, H, seed);
+  assert.strictEqual(field.reduce((a, v) => a + v, 0), 80, 'field is 10 × 8 with its hole filled');
+  const ring = simplify(outline(field, W, H), 1);
+  assert.strictEqual(ring.length, 5, 'a rectangle simplifies to 4 corners + closing point');
+  const xs = ring.map(p => p[0]), ys = ring.map(p => p[1]);
+  assert.deepStrictEqual([Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)], [5, 15, 6, 14]);
+});

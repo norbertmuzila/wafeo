@@ -4,7 +4,7 @@ const express = require('express');
 const { OAuth2Client } = require('google-auth-library');
 const config = require('../config');
 const store = require('../store');
-const { hashPassword, verifyPassword, publicUser, signToken, requireAuth, rateLimit } = require('../auth');
+const { hashPassword, verifyPassword, publicUser, signToken, signDemoToken, requireAuth, rateLimit } = require('../auth');
 
 const router = express.Router();
 const googleClient = new OAuth2Client();
@@ -109,8 +109,17 @@ router.post('/register', authLimiter, async (req, res) => {
   }
 });
 
+// "Try the demo": explore the whole platform without an account. Nothing
+// a demo visitor does is stored, and the session lasts 12 hours.
+const demoLimiter = rateLimit({ windowMs: 60 * 60 * 1000, max: 20 });
+router.post('/demo', demoLimiter, (req, res) => res.json(signDemoToken()));
+
 // Lets the frontend restore a saved session after a page reload.
 router.get('/me', requireAuth, async (req, res) => {
+  if (req.user.role === 'demo') {
+    const { iat, exp, ...user } = req.user;
+    return res.json({ token: req.headers.authorization.slice(7).trim(), user: { ...user, demo: true } });
+  }
   const user = await store.findUserById(req.user.id);
   if (!user) return res.status(401).json({ error: 'Account no longer exists' });
   res.json(session(user)); // fresh token extends the session

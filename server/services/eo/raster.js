@@ -10,8 +10,11 @@ const { projectRing, pointInRing } = require('./geo');
 const MAX_PIXELS = 160000; // 400 × 400 per band keeps memory and time bounded
 
 // A pixel grid in the raster's CRS covering the AOI, plus the AOI mask.
-function makeGrid(aoi, epsg, nativeRes) {
+// `maskAoi` (optional) masks a different polygon than the one framed,
+// e.g. a field drawn inside a wider picture.
+function makeGrid(aoi, epsg, nativeRes, maskAoi = null) {
   const ring = projectRing(aoi, epsg);
+  const maskRing = maskAoi ? projectRing(maskAoi, epsg) : ring;
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
   for (const [x, y] of ring) {
     if (x < minX) minX = x; if (y < minY) minY = y;
@@ -29,7 +32,7 @@ function makeGrid(aoi, epsg, nativeRes) {
     const y = bbox[3] - (r + 0.5) * res;
     for (let c = 0; c < width; c++) {
       const x = bbox[0] + (c + 0.5) * res;
-      if (pointInRing(x, y, ring)) { mask[r * width + c] = 1; inside++; }
+      if (pointInRing(x, y, maskRing)) { mask[r * width + c] = 1; inside++; }
     }
   }
   // A tiny polygon may fall between pixel centres: keep the centre pixel.

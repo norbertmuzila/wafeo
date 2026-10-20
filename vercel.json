@@ -38,6 +38,14 @@
       "use": "@vercel/static"
     },
     {
+      "src": "atlas.js",
+      "use": "@vercel/static"
+    },
+    {
+      "src": "report.js",
+      "use": "@vercel/static"
+    },
+    {
       "src": "landing.js",
       "use": "@vercel/static"
     },

@@ -145,3 +145,25 @@ test('private files are not served', async () => {
   assert.ok(privacy.status === 200 && privacy.text.includes('Privacy Policy'), 'privacy page served');
   assert.ok([401, 404].includes((await call('GET', '/api/seed?secret=wafeo-admin-seed-2024')).status), 'seed route removed');
 });
+
+test('demo session: no account, can explore, cannot save or administer', async () => {
+  const demo = await call('POST', '/api/auth/demo');
+  assert.strictEqual(demo.status, 200);
+  assert.strictEqual(demo.json.user.role, 'demo');
+  const token = demo.json.token;
+  const me = await call('GET', '/api/auth/me', { token });
+  assert.strictEqual(me.status, 200);
+  assert.strictEqual(me.json.user.demo, true);
+  assert.strictEqual((await call('POST', '/api/reports', { token, body: { title: 'x' } })).status, 403);
+  assert.deepStrictEqual((await call('GET', '/api/reports', { token })).json.reports, []);
+  assert.strictEqual((await call('GET', '/api/admin/users', { token })).status, 403);
+  assert.strictEqual((await call('POST', '/api/eo/analyze', { token, body: {} })).status, 400, 'analysis open to demo');
+  const users = JSON.parse(fs.readFileSync(tmpUsers, 'utf8'));
+  assert.ok(!users.some(u => u.role === 'demo'), 'demo visitors are never stored');
+});
+
+test('field tracing validates the click', async () => {
+  assert.strictEqual((await call('GET', '/api/eo/field?lon=10&lat=10')).status, 401);
+  const token = await login('farmer');
+  assert.strictEqual((await call('GET', '/api/eo/field?lon=abc&lat=1', { token })).status, 400);
+});

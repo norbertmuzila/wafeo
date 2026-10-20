@@ -85,7 +85,7 @@
     const tone = x.tone ? x.tone(v) : 'neutral';
     return `<div class="lv-card lv-${tone}${opts.big ? ' lv-big' : ''}">
       <div class="lv-card-top"><span class="lv-card-label">${esc(x.label)}</span>
-        <button type="button" class="lv-info" aria-expanded="false" title="What is this?">ⓘ</button></div>
+        <button type="button" class="lv-info" aria-expanded="false" title="What is this?"><i data-lucide="info"></i></button></div>
       <div class="lv-card-value">${val}${x.unit ? `<small> ${esc(x.unit)}</small>` : ''}</div>
       <div class="lv-card-plain">${esc(x.plain)}</div>
       <div class="lv-card-tech" hidden><b>How it is measured:</b> ${esc(x.tech || '')}</div>
@@ -94,12 +94,12 @@
   const cards = (keys, metrics) => `<div class="lv-cards">${keys.map(k => card(k, metrics)).join('')}</div>`;
 
   function plainBox(title, text, tone) {
-    return `<div class="lv-plain lv-${tone || 'neutral'}"><div class="lv-plain-icon">💬</div><div><div class="lv-plain-title">${esc(title)}</div><div class="lv-plain-text">${esc(text)}</div></div></div>`;
+    return `<div class="lv-plain lv-${tone || 'neutral'}"><div class="lv-plain-icon"><i data-lucide="message-square-text"></i></div><div><div class="lv-plain-title">${esc(title)}</div><div class="lv-plain-text">${esc(text)}</div></div></div>`;
   }
 
   // Recommendations for this page, tabbed by audience.
   function actions(a, pattern) {
-    const who = [['farmers', '👩🏾‍🌾 Farmers'], ['government', '🏛️ Government'], ['public', '👥 Public']];
+    const who = [['farmers', '<i data-lucide="tractor"></i>Farmers'], ['government', '<i data-lucide="landmark"></i>Government'], ['public', '<i data-lucide="users"></i>Public']];
     const lists = who.map(([k]) => (a.recommendations[k] || []).filter(r => !pattern || pattern.test(r.action + ' ' + r.why)));
     const first = Math.max(0, lists.findIndex(l => l.length));
     return `<div class="lv-actions">
@@ -110,7 +110,7 @@
 
   function issuesList(a, domains) {
     const list = a.issues.filter(i => !domains || domains.includes(i.domain));
-    if (!list.length) return `<div class="lv-ok">✅ No warning signs in this data right now.</div>`;
+    if (!list.length) return `<div class="lv-ok"><i data-lucide="circle-check"></i>No warning signs in this data right now.</div>`;
     return `<div class="lv-issues">${list.map(i => `<div class="lv-issue lv-sev-${i.severity}"><span class="lv-chip lv-sev-${i.severity}">${esc(i.severity)}</span><div><b>${esc(i.title)}</b><div>${esc(i.detail)}</div><div class="lv-evidence">Evidence: ${esc(i.evidence)}</div></div></div>`).join('')}</div>`;
   }
 
@@ -119,7 +119,7 @@
     const rows = d ? Object.entries(d.metrics || {}).filter(([, v]) => v !== null && v !== undefined).map(([k, v]) => `<tr><td>${esc((X[k] && X[k].label) || site().labels[k] || k)}</td><td>${site().metricValue(k, v)}</td><td class="lv-tech-cell">${esc((X[k] && X[k].tech) || '')}</td></tr>`).join('') : '';
     const srcs = a.sources.filter(s => sourceNames.some(n => s.name.includes(n)));
     return `<details class="lv-science lv-expert-open">
-      <summary>🔬 Show the science: every reading, method and source</summary>
+      <summary><i data-lucide="microscope"></i>Show the science: every reading, method and source</summary>
       ${note ? `<p class="lv-note">${esc(note)}</p>` : ''}
       ${rows ? `<div class="lv-table-wrap"><table class="lv-table"><thead><tr><th>Reading</th><th>Value</th><th>Method</th></tr></thead><tbody>${rows}</tbody></table></div>` : ''}
       <div class="lv-sources">${srcs.map(s => `<div><span class="lv-chip lv-src-${s.status.replace(/\s/g, '')}">${esc(s.status)}</span> <b>${esc(s.name)}</b> · ${esc(s.provider)}${s.detail ? ' · ' + esc(s.detail) : ''}</div>`).join('')}</div>
@@ -130,14 +130,15 @@
   function siteBar(a) {
     const p = a && a.data.place;
     return `<div class="lv-sitebar">
-      <div class="lv-site-now">${a ? `📍 <b>${esc([p && p.name, p && p.country].filter(Boolean).join(', ') || 'Selected area')}</b> · ${a.aoi.areaHa.toLocaleString()} ha · analysed ${ago(a.generatedAt)}
-        <button type="button" class="lv-link" data-lv="refresh" title="Fetch the newest satellite and weather data">↻ Refresh now</button>
-        <button type="button" class="lv-link" data-lv="open-si">🗺️ Map &amp; full analysis</button>` : '📍 <b>No area selected yet.</b> Search a farm, town or coordinates to see live results.'}</div>
+      <div class="lv-site-now">${a ? `<i data-lucide="map-pin"></i> <b>${esc([p && p.name, p && p.country].filter(Boolean).join(', ') || 'Selected area')}</b> · ${a.aoi.areaHa.toLocaleString()} ha · analysed ${ago(a.generatedAt)}
+        <button type="button" class="lv-link" data-lv="refresh" title="Fetch the newest satellite and weather data"><i data-lucide="refresh-cw"></i>Refresh now</button>
+        <button type="button" class="lv-link" data-lv="open-si"><i data-lucide="map"></i>Map &amp; full analysis</button>
+        <button type="button" class="lv-btn report-pdf-btn lv-pdf" data-report-pdf><i data-lucide="file-down"></i>PDF report</button>` : '<i data-lucide="map-pin"></i> <b>No area selected yet.</b> Click a field on the dashboard map, or search a farm, town or coordinates.'}</div>
       <form class="lv-search" data-lv="search">
         <input type="search" name="q" placeholder="Farm, town or coordinates (e.g. Goromonzi or -17.85, 31.35)" aria-label="Place to analyse">
         <select name="r" aria-label="Area size"><option value="500">500 m</option><option value="1000" selected>1 km</option><option value="2000">2 km</option><option value="5000">5 km</option><option value="10000">10 km</option><option value="25000">25 km</option></select>
         <button type="submit" class="lv-btn">Analyse</button>
-        <button type="button" class="lv-btn-ghost" data-lv="locate" title="Use my current location">📍 My location</button>
+        <button type="button" class="lv-btn-ghost" data-lv="locate" title="Use my current location"><i data-lucide="locate-fixed"></i>My location</button>
       </form>
       <div class="lv-view" role="group" aria-label="Level of detail"><button type="button" data-view="simple">Simple</button><button type="button" data-view="expert">Expert</button></div>
       <div class="lv-progress" hidden></div>
@@ -275,7 +276,8 @@
   }
 
   const ALERT_COLOR = { red: '#d93025', orange: '#f29900', green: '#34a853' };
-  const hazardIcon = { Drought: '🏜️', Flood: '🌊', 'Tropical cyclone': '🌀', Volcano: '🌋', Wildfire: '🔥', Earthquake: '🌐' };
+const HAZARD_ICON = { Drought: 'sun', Flood: 'waves', 'Tropical cyclone': 'tornado', Volcano: 'mountain-snow', Wildfire: 'flame', Earthquake: 'activity' };
+  const hazardIcon = new Proxy({}, { get: (_, t) => `<i data-lucide="${HAZARD_ICON[t] || 'triangle-alert'}"></i>` });
 
   // ─── Page renderers ───────────────────────────────────────
   const PAGES = {
@@ -352,12 +354,12 @@
     },
     'early-warning': a => {
       const hz = (a.data.hazards && a.data.hazards.events) || [];
-      const top = ['farmers', 'government', 'public'].map((k, i) => [['👩🏾‍🌾 Farmers', '🏛️ Government', '👥 Public'][i], a.recommendations[k][0]]).filter(([, r]) => r);
+      const top = ['farmers', 'government', 'public'].map((k, i) => [['<i data-lucide="tractor"></i>Farmers', '<i data-lucide="landmark"></i>Government', '<i data-lucide="users"></i>Public'][i], a.recommendations[k][0]]).filter(([, r]) => r);
       return `${plainBox(`${a.overall.riskLevel} risk`, a.overall.headline, toneOf(a.overall.riskLevel))}
         <div class="lv-panel"><h3>Do this first</h3><div class="lv-first">${top.map(([w, r]) => `<div class="lv-first-item lv-sev-${r.severity}"><div class="lv-first-who">${w}</div><div>${esc(r.action)}</div></div>`).join('')}</div></div>
         <div class="lv-panel"><h3>All warnings for this area, most urgent first</h3>${issuesList(a)}</div>
         <div class="lv-grid2">
-          <div class="lv-panel"><h3>Live hazards within 600 km (GDACS)</h3>${hz.length ? `<ul class="lv-hazards">${hz.map(e => `<li><span class="lv-dot" style="background:${ALERT_COLOR[e.alert] || '#999'}"></span>${hazardIcon[e.type] || '⚠️'} <b>${esc(e.type)}</b> · ${esc(e.country)} · ${num(e.distanceKm, 0)} km · ${esc(e.alert)} alert${e.url ? ` · <a href="${esc(e.url)}" target="_blank" rel="noopener">report</a>` : ''}</li>`).join('')}</ul>` : '<div class="lv-ok">✅ No active GDACS hazards within 600 km.</div>'}</div>
+          <div class="lv-panel"><h3>Live hazards within 600 km (GDACS)</h3>${hz.length ? `<ul class="lv-hazards">${hz.map(e => `<li><span class="lv-dot" style="background:${ALERT_COLOR[e.alert] || '#999'}"></span>${hazardIcon[e.type]} <b>${esc(e.type)}</b> · ${esc(e.country)} · ${num(e.distanceKm, 0)} km · ${esc(e.alert)} alert${e.url ? ` · <a href="${esc(e.url)}" target="_blank" rel="noopener">report</a>` : ''}</li>`).join('')}</ul>` : '<div class="lv-ok"><i data-lucide="circle-check"></i>No active GDACS hazards within 600 km.</div>'}</div>
           <div class="lv-panel"><h3>Map</h3><div class="lv-map" id="lvWarnMap"></div></div>
         </div>
         ${science(a, 'waterQuantity', ['GDACS', 'Open-Meteo', 'ERA5', 'GloFAS', 'FEWS NET', 'Sentinel-2'], 'Warnings are generated from the live readings for this area; hazards come from GDACS and are checked every 15 minutes.')}`;
@@ -417,7 +419,7 @@
       chart('lvFcChart', { data: { labels: fc.map(d => d.date.slice(5)), datasets: [{ type: 'bar', label: 'Rain (mm)', data: fc.map(d => d.rainMm), backgroundColor: '#3a86c8' }, { type: 'line', label: 'Crop water need ET₀ (mm)', data: fc.map(d => d.et0Mm), borderColor: '#e8a33a', tension: 0.3, pointRadius: 2 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top' } } } });
     }
     if (pageId === 'early-warning') aoiMap('lvWarnMap', a, m => {
-      ((a.data.hazards && a.data.hazards.events) || []).forEach(e => L.circleMarker([e.lat, e.lon], { radius: 8, color: '#fff', weight: 2, fillColor: ALERT_COLOR[e.alert] || '#999', fillOpacity: 0.95 }).bindPopup(`${hazardIcon[e.type] || '⚠️'} <b>${esc(e.type)}</b><br>${esc(e.country)}<br>${esc(e.alert)} alert · ${num(e.distanceKm, 0)} km away`).addTo(m));
+      ((a.data.hazards && a.data.hazards.events) || []).forEach(e => L.circleMarker([e.lat, e.lon], { radius: 8, color: '#fff', weight: 2, fillColor: ALERT_COLOR[e.alert] || '#999', fillOpacity: 0.95 }).bindPopup(`${hazardIcon[e.type]} <b>${esc(e.type)}</b><br>${esc(e.country)}<br>${esc(e.alert)} alert · ${num(e.distanceKm, 0)} km away`).addTo(m));
     });
   }
 
@@ -429,7 +431,7 @@
     wire(host);
     const a = A();
     if (!a) {
-      host.innerHTML = `${siteBar(null)}<div class="lv-empty"><div class="lv-empty-icon">🛰️</div><h3>See live satellite results for any farm or region</h3><p>Search a place above, use your location, or click the map on the Dashboard. WAFEO reads the newest Sentinel-2 and Landsat imagery, soil maps, rainfall records, river flow, food-security and hazard alerts for that exact area, then explains what they mean and what to do.</p></div>`;
+      host.innerHTML = `${siteBar(null)}<div class="lv-empty"><div class="lv-empty-icon"><i data-lucide="satellite"></i></div><h3>See live satellite results for any farm or region</h3><p>Zoom into the Dashboard map and click a field, or search a place above, or use your location. WAFEO reads the newest Sentinel-2 and Landsat imagery, soil maps, rainfall records, river flow, food-security and hazard alerts for that exact area, then explains what they mean and what to do.</p></div>`;
     } else {
       const fn = PAGES[pageId];
       host.innerHTML = siteBar(a) + (fn ? fn(a) : '');
@@ -451,37 +453,24 @@
     return liveHazards;
   }
 
-  function attachDashboardMap(m) {
-    if (!m || m._wafeoLive) return;
-    m._wafeoLive = true;
-    m.on('click', e => {
-      const { lat, lng } = e.latlng;
-      const html = `<div class="lv-popup"><b>Analyse this place?</b><br>${lat.toFixed(4)}, ${lng.toFixed(4)}<br><button type="button" class="lv-btn" data-lat="${lat}" data-lon="${lng}">Analyse 1 km around it</button></div>`;
-      L.popup().setLatLng(e.latlng).setContent(html).openOn(m);
-    });
-    m.getContainer().addEventListener('click', e => {
-      const b = e.target.closest('.lv-popup button[data-lat]');
-      if (!b) return;
-      m.closePopup();
+  // The dashboard map is the world atlas (atlas.js); clicks there start analyses here.
+  function attachDashboardMap() {
+    const atlas = window.wafeoAtlas;
+    if (!atlas || atlas._wafeoLive) return;
+    atlas._wafeoLive = true;
+    atlas.onAnalyse = (body, label) => {
       const host = document.querySelector('#pg-dashboard .lv-host');
-      runFrom(host, { point: [Number(b.dataset.lon), Number(b.dataset.lat)], radius_m: 1000 }, 'Selected point');
-    });
-    drawDashboardMap();
+      runFrom(host, body, label);
+      host.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    };
   }
 
-  async function drawDashboardMap() {
-    if (typeof map === 'undefined' || !map) return;
-    try {
-      const events = await loadHazards();
-      if (hazardLayer) map.removeLayer(hazardLayer);
-      hazardLayer = L.layerGroup(events.filter(e => e.type !== 'Earthquake').map(e => L.circleMarker([e.lat, e.lon], { radius: e.alert === 'red' ? 10 : e.alert === 'orange' ? 8 : 5, color: '#fff', weight: 1.5, fillColor: ALERT_COLOR[e.alert] || '#999', fillOpacity: 0.9 })
-        .bindPopup(`${hazardIcon[e.type] || '⚠️'} <b>${esc(e.type)}</b> · ${esc(e.alert)} alert<br>${esc(e.name || '')}<br>${esc(e.country)}<br>${esc(String(e.from).slice(0, 10))} → ${esc(String(e.to).slice(0, 10))}${e.url ? `<br><a href="${esc(e.url)}" target="_blank" rel="noopener">GDACS report</a>` : ''}`))).addTo(map);
-    } catch (e) { /* hazard layer is optional */ }
+  async function drawDashboardMap(fly) {
+    const atlas = window.wafeoAtlas;
+    if (!atlas) return;
+    try { atlas.setHazards(await loadHazards()); } catch (e) { /* hazard layer is optional */ }
     const a = A();
-    if (siteLayer) map.removeLayer(siteLayer);
-    if (a) {
-      siteLayer = L.polygon(a.aoi.geometry.coordinates[0].map(([x, y]) => [y, x]), { color: '#9BE07A', weight: 3, fillOpacity: 0.2 }).bindTooltip('Your analysed area').addTo(map);
-    }
+    atlas.setAoi(a ? a.aoi.geometry : null, fly);
   }
 
   function renderDashboard() {
@@ -502,10 +491,10 @@
       <div class="lv-grid2">
         <div class="lv-panel"><h3>What to do now</h3>${actions(a)}</div>
         <div class="lv-panel"><h3>Greenness over two years</h3><div class="lv-chart lv-chart-sm"><canvas id="lvDashNdvi"></canvas></div><p class="lv-note" id="lvDashNdviNote">Loading Sentinel-2 history…</p></div>
-      </div>` : `<div class="lv-empty"><div class="lv-empty-icon">🗺️</div><h3>Click anywhere on the map, or search above, to analyse a farm or region</h3><p>Coloured dots are live hazard alerts from GDACS (red = most severe).</p></div>`) + `
+      </div>` : `<div class="lv-empty"><div class="lv-empty-icon"><i data-lucide="mouse-pointer-click"></i></div><h3>Zoom into the map and click a field to analyse it</h3><p>Spin the globe or switch to the flat map, open any country from the Atlas, then zoom in until you can see fields. Clicking inside a field traces its outline from the latest satellite image, ready for a full analysis. You can also search a place above. Coloured dots are live hazard alerts (red is most severe).</p></div>`) + `
       <div class="lv-panel"><h3>Live hazard alerts worldwide (GDACS)</h3>
         <p class="lv-note">${red} red and ${orange} orange alerts in the last 45 days · checked ${hazardsAt ? ago(new Date(hazardsAt).toISOString()) : 'now'} · click a dot on the map for details.</p>
-        <ul class="lv-hazards">${liveHazards.filter(e => e.alert !== 'green').slice(0, 8).map(e => `<li><span class="lv-dot" style="background:${ALERT_COLOR[e.alert]}"></span>${hazardIcon[e.type] || '⚠️'} <b>${esc(e.type)}</b> · ${esc(e.country)} · ${esc(String(e.from).slice(0, 10))}${e.url ? ` · <a href="${esc(e.url)}" target="_blank" rel="noopener">report</a>` : ''}</li>`).join('') || '<li>No orange or red alerts right now.</li>'}</ul>
+        <ul class="lv-hazards">${liveHazards.filter(e => e.alert !== 'green').slice(0, 8).map(e => `<li><span class="lv-dot" style="background:${ALERT_COLOR[e.alert]}"></span>${hazardIcon[e.type]} <b>${esc(e.type)}</b> · ${esc(e.country)} · ${esc(String(e.from).slice(0, 10))}${e.url ? ` · <a href="${esc(e.url)}" target="_blank" rel="noopener">report</a>` : ''}</li>`).join('') || '<li>No orange or red alerts right now.</li>'}</ul>
       </div>`;
     if (a) ndviChart('lvDashNdvi', 'lvDashNdviNote');
     applyView();
@@ -514,18 +503,17 @@
 
   async function dashboard() {
     // The map is created while its page may be hidden; resize once visible.
-    if (typeof map !== 'undefined' && map) { setTimeout(() => map.invalidateSize(), 60); setTimeout(() => map.invalidateSize(), 450); }
+    if (window.wafeoAtlas) { window.wafeoAtlas.init(); window.wafeoAtlas.resize(); }
     renderDashboard();
     try { await loadHazards(); } catch (e) {}
     renderDashboard();
-    if (typeof map !== 'undefined' && map) { attachDashboardMap(map); drawDashboardMap(); }
+    attachDashboardMap();
+    drawDashboardMap();
   }
 
   // ─── Header: freshness and notifications ──────────────────
   function updateFreshness() {
-    const tag = document.getElementById('dataFreshness');
     const a = A();
-    if (tag) tag.innerHTML = `<div class="live-dot"></div>${a ? `Live · analysed ${ago(a.generatedAt)}` : 'Live feeds'}`;
     // Sidebar badges follow the live analysis.
     const setBadge = (page, text, cls) => {
       const link = document.querySelector(`.nav-link[data-page="${page}"]`);
@@ -541,17 +529,7 @@
     const fsd = a && a.domains.foodSecurity;
     const ph = fsd && /Phase (\d)/.exec(fsd.status || '');
     setBadge('food-security', ph ? `IPC ${ph[1]}` : '', ph && Number(ph[1]) >= 3 ? 'crit' : 'warn');
-    const badge = document.getElementById('notifBadge');
-    if (badge) {
-      const n = a ? a.issues.filter(i => i.severity === 'critical' || i.severity === 'high').length : 0;
-      badge.textContent = n || '';
-      badge.style.display = n ? 'flex' : 'none';
-    }
   }
-  window.handleNotifClick = function () {
-    const l = document.querySelector('.nav-link[data-page="early-warning"]');
-    if (l) l.click();
-  };
 
   // ─── Wiring ───────────────────────────────────────────────
   const PAGE_IDS = Object.keys(PAGES);
@@ -567,7 +545,7 @@
     const pg = currentPage();
     if (PAGE_IDS.includes(pg)) render(pg);
     if (pg === 'dashboard') renderDashboard();
-    drawDashboardMap();
+    drawDashboardMap(pg === 'dashboard');
     updateFreshness();
   });
   // Keep results current: an analysis older than 6 hours refreshes itself.
@@ -582,5 +560,5 @@
   document.addEventListener('wafeo:auth', () => setTimeout(() => { updateFreshness(); if (currentPage() === 'dashboard') dashboard(); refreshIfStale(); }, 400));
   setInterval(() => { updateFreshness(); if (currentPage() === 'dashboard') dashboard(); refreshIfStale(); }, 15 * 60 * 1000);
 
-  window.wafeoLive = { render, dashboard, attachDashboardMap };
+  window.wafeoLive = { render, dashboard, attachDashboardMap, explain: X };
 })();

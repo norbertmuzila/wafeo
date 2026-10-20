@@ -19,9 +19,14 @@
 <!-- Chart.js for Water Body Analytics -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <!-- TensorFlow.js for the LSTM NDVI forecast -->
-<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.20.0/dist/tf.min.js"></script>
-<link rel="stylesheet" href="style.css?v=21">
-<link rel="stylesheet" href="landing.css?v=2">
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.6.0/dist/maplibre-gl.css">
+<script src="https://unpkg.com/maplibre-gl@5.6.0/dist/maplibre-gl.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
+<script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js" defer></script>
+<link rel="stylesheet" href="style.css?v=22">
+<link rel="stylesheet" href="landing.css?v=3">
 </head>
 <body>
 
@@ -40,10 +45,14 @@
         <a href="#" data-lp-goto="analyst">Analyst</a>
         <a href="#" data-lp-goto="about">About</a>
       </div>
-      <button class="lp-btn lp-btn-leaf" data-lp-enter>
-        <span data-lp-cta-label>Sign in</span>
-        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 8h10M9 4l4 4-4 4"/></svg>
-      </button>
+      <div class="lp-nav-ctas">
+        <button class="lp-btn lp-btn-demo" data-lp-demo><i data-lucide="play"></i>Try the demo</button>
+        <button class="lp-btn lp-btn-ghost lp-nav-signup" data-lp-enter="register">Sign up</button>
+        <button class="lp-btn lp-btn-leaf" data-lp-enter>
+          <span data-lp-cta-label>Sign in</span>
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 8h10M9 4l4 4-4 4"/></svg>
+        </button>
+      </div>
     </nav>
 
     <aside class="lp-rail" id="lpRail" aria-label="Page sections">
@@ -224,13 +233,14 @@
           <span class="lp-mask" style="--d:60ms"><span>Pick a field.</span></span>
           <span class="lp-mask" style="--d:180ms"><span><em>We'll show you what orbit sees.</em></span></span>
         </h2>
-        <p class="lp-lede lp-reveal" style="--d:260ms">Sign in with your Google account or create a free account. Your dashboard opens on the live global picture.</p>
+        <p class="lp-lede lp-reveal" style="--d:260ms">Sign in with your Google account or create a free account, or try the demo straight away with no account. Your dashboard opens on the live global picture.</p>
         <div class="lp-cta-row lp-reveal" style="--d:360ms">
           <button class="lp-btn lp-btn-leaf" data-lp-enter>
             <span data-lp-cta-label>Enter the platform</span>
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 8h10M9 4l4 4-4 4"/></svg>
           </button>
           <button class="lp-btn lp-btn-ghost" data-lp-enter="register">Create an account</button>
+          <button class="lp-btn lp-btn-demo" data-lp-demo><i data-lucide="play"></i>Try the demo</button>
         </div>
       </div>
     </section>
@@ -249,7 +259,7 @@
 
 
     <div class="login-card-simple">
-      <button type="button" class="lp-home-link" onclick="wafeoShowHome()">&larr; Back to home</button>
+      <button type="button" class="lp-home-link" onclick="wafeoShowHome()"><i data-lucide="arrow-left"></i>Back to home</button>
       <div style="display:flex; justify-content:center; margin-bottom: 20px;">
         <div class="waf-brand">
           <img src="assets/wafeo-logo.svg" alt="WAFEO logo" class="waf-logo-img">
@@ -285,9 +295,10 @@
         </div>
       </div>
       
-      <div style="display: flex; justify-content: center; margin-bottom: 20px;">
+      <div style="display: flex; justify-content: center; margin-bottom: 12px;">
         <div id="googleButtonContainer"></div> <!-- Real Google Sign-In Button will be injected here -->
       </div>
+      <button type="button" class="btn-demo" onclick="wafeoStartDemo()"><i data-lucide="play"></i>Try the demo (no account needed)</button>
       
       <div class="login-nb">
         <strong>NB:</strong> Forgot Password? <a href="#" onclick="event.preventDefault(); showLoginError('Use 'Sign in with Google' with the same email, or ask a WAFEO administrator to reset your password.');">Reset password</a><br>
@@ -400,29 +411,29 @@
     <nav class="sb-nav" id="sidebarNav">
       <div class="nav-group">
         <div class="nav-group-label">Overview</div>
-        <div class="nav-link active" data-page="dashboard"><span class="ni">🌍</span>Global Dashboard</div>
-        <div class="nav-link" data-page="site-intelligence" style="color:var(--accent-blue); font-weight:bold;"><span class="ni">🛰️</span>Site Intelligence</div>
+        <div class="nav-link active" data-page="dashboard"><span class="ni"><i data-lucide="globe-2"></i></span>Global Dashboard</div>
+        <div class="nav-link" data-page="site-intelligence" style="color:var(--accent-blue); font-weight:bold;"><span class="ni"><i data-lucide="scan-search"></i></span>Site Intelligence</div>
       </div>
       <div class="nav-group">
         <div class="nav-group-label">Agriculture</div>
-        <div class="nav-link" data-page="precision-farming"><span class="ni">🌾</span>Precision Farming</div>
-        <div class="nav-link" data-page="crop-monitoring"><span class="ni">🛰️</span>Crop Monitoring</div>
-        <div class="nav-link" data-page="soil-analysis"><span class="ni">🧪</span>Soil Analysis</div>
+        <div class="nav-link" data-page="precision-farming"><span class="ni"><i data-lucide="tractor"></i></span>Precision Farming</div>
+        <div class="nav-link" data-page="crop-monitoring"><span class="ni"><i data-lucide="sprout"></i></span>Crop Monitoring</div>
+        <div class="nav-link" data-page="soil-analysis"><span class="ni"><i data-lucide="layers"></i></span>Soil Analysis</div>
       </div>
       <div class="nav-group">
         <div class="nav-group-label">Water</div>
-        <div class="nav-link" data-page="water-resources"><span class="ni">💧</span>Water Resources</div>
-        <div class="nav-link" data-page="drought-monitor"><span class="ni">🏜️</span>Drought Monitor</div>
+        <div class="nav-link" data-page="water-resources"><span class="ni"><i data-lucide="droplets"></i></span>Water Resources</div>
+        <div class="nav-link" data-page="drought-monitor"><span class="ni"><i data-lucide="sun"></i></span>Drought Monitor</div>
       </div>
       <div class="nav-group">
         <div class="nav-group-label">Food Security</div>
-        <div class="nav-link" data-page="food-security"><span class="ni">🛡️</span>Food Security</div>
-        <div class="nav-link" data-page="early-warning"><span class="ni">⚠️</span>Early Warning</div>
+        <div class="nav-link" data-page="food-security"><span class="ni"><i data-lucide="wheat"></i></span>Food Security</div>
+        <div class="nav-link" data-page="early-warning"><span class="ni"><i data-lucide="triangle-alert"></i></span>Early Warning</div>
       </div>
       <div class="nav-group">
         <div class="nav-group-label">System</div>
-        <div class="nav-link" data-page="reports"><span class="ni">📋</span>Reports</div>
-        <div class="nav-link" data-page="settings"><span class="ni">⚙️</span>Settings</div>
+        <div class="nav-link" data-page="reports"><span class="ni"><i data-lucide="file-text"></i></span>Reports</div>
+        <div class="nav-link" data-page="users" id="navUsers" hidden><span class="ni"><i data-lucide="users"></i></span>Users</div>
         
         <!-- The SVG Action Button (Floating Panel Trigger) -->
         <div id="aiFabBtn" class="ai-fab" style="margin: 12px 16px;">
@@ -451,7 +462,7 @@
         <div class="uname" id="sbName">Admin User</div>
         <div class="urole" id="sbRole">Administrator</div>
       </div>
-      <div class="hdr-btn" onclick="doLogout()" title="Logout" style="margin-left:auto;width:30px;height:30px;font-size:12px">⏻</div>
+      <div class="hdr-btn" onclick="doLogout()" title="Sign out" id="btnLogout" style="margin-left:auto;width:30px;height:30px"><i data-lucide="log-out"></i></div>
     </div>
   </aside>
 
@@ -462,88 +473,48 @@
           <h2 id="pgTitle">Dashboard</h2>
           <span class="crumb" id="pgCrumb">WAFEO / Overview</span>
         </div>
-        <div id="continentSelector" class="continent-selector">
-          <div class="cont-box" onclick="flyToContinent('Asia')">
-            <div class="cont-ico ico-asia">🌏</div>
-            <div class="cont-lbl" style="color: #0a6952;">ASIA</div>
-            <div class="cont-sub">Click Continent</div>
-          </div>
-          <div class="cont-box" onclick="flyToContinent('Africa')">
-            <div class="cont-ico ico-africa">🌍</div>
-            <div class="cont-lbl" style="color: #b97416;">AFRICA</div>
-            <div class="cont-sub">Click Continent</div>
-          </div>
-          <div class="cont-box" onclick="flyToContinent('NorthAmerica')">
-            <div class="cont-ico ico-namerica">🌎</div>
-            <div class="cont-lbl" style="color: #538116;">N. AMERICA</div>
-            <div class="cont-sub">Click Continent</div>
-          </div>
-          <div class="cont-box" onclick="flyToContinent('SouthAmerica')">
-            <div class="cont-ico ico-samerica">🌎</div>
-            <div class="cont-lbl" style="color: #2d6a1e;">S. AMERICA</div>
-            <div class="cont-sub">Click Continent</div>
-          </div>
-          <div class="cont-box" onclick="flyToContinent('Antarctica')">
-            <div class="cont-ico ico-antarctica">🧊</div>
-            <div class="cont-lbl" style="color: #64b5f6;">ANTARCTICA</div>
-            <div class="cont-sub">Click Continent</div>
-          </div>
-          <div class="cont-box" onclick="flyToContinent('Europe')">
-            <div class="cont-ico ico-europe">🌍</div>
-            <div class="cont-lbl" style="color: #8cb6df;">EUROPE</div>
-            <div class="cont-sub">Click Continent</div>
-          </div>
-          <div class="cont-box" onclick="flyToContinent('Oceania')">
-            <div class="cont-ico ico-oceania">🌏</div>
-            <div class="cont-lbl" style="color: #9bbbd5;">OCEANIA</div>
-            <div class="cont-sub">Click Continent</div>
-          </div>
-        </div>
       </div>
       <div class="tb-right">
-        <div class="hdr-btn" id="themeToggle" onclick="toggleTheme()" title="Toggle Light/Dark Theme" style="width:28px; height:28px; font-size:12px;">🌙</div>
-        <div class="live-tag" id="dataFreshness"><div class="live-dot"></div>All Sources Fresh</div>
-        <div class="search-box"><span>🔍</span><input type="text" placeholder="Search regions, crops..." id="globalSearch"></div>
-        <div class="hdr-btn" id="notifBell" onclick="handleNotifClick()" title="Notifications" style="position:relative;cursor:pointer;">🔔<div class="notif" id="notifBadge"></div></div>
+        <div class="demo-pill" id="demoPill" hidden><i data-lucide="play"></i>Demo mode · nothing is saved <button type="button" onclick="wafeoLeaveDemo()">Create an account</button></div>
+        <button type="button" class="hdr-btn" id="themeToggle" onclick="toggleTheme()" title="Switch light / dark theme" style="width:32px; height:32px;"><i data-lucide="moon"></i></button>
       </div>
     </header>
 
     <!-- ═══ DASHBOARD ═══ -->
     <div class="page active" id="pg-dashboard">
       <div class="pg-pad">
-        <div class="dashboard-map-container" style="position: relative; width: 100%; height: 500px; margin-bottom: 24px; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.05); border: 1px solid var(--border);">
-          <div id="worldMap" style="width: 100%; height: 100%;"></div>
-          
-          <!-- Map Controls & Satellite Overlays Wrapper -->
-          <div style="position:absolute; top:12px; left:12px; z-index:1000; display:flex; flex-direction:column; gap:10px;">
-            <!-- Google Earth Engine Style Base Map Controls -->
-            <div class="gmap-ctrls" style="margin: 0;">
-              <div class="g-btn active" id="gbtn-map">
-                <div class="g-btn-main" id="gbtn-map-click">Map</div>
-                <div class="g-btn-dropdown">
-                  <label><input type="checkbox" id="gchk-terrain"> Terrain</label>
-                </div>
-              </div>
-              <div style="width:1px; background:#e6e6e6; margin:6px 0;"></div>
-              <div class="g-btn" id="gbtn-sat">
-                <div class="g-btn-main" id="gbtn-sat-click">Satellite</div>
-                <div class="g-btn-dropdown">
-                  <label><input type="checkbox" id="gchk-labels" checked> Labels</label>
-                </div>
+        <div class="atlas" id="atlas">
+          <div id="atlasMap" class="atlas-map" role="application" aria-label="World map"></div>
+          <div class="atlas-toolbar">
+            <div class="atlas-seg" role="group" aria-label="Map view">
+              <button type="button" class="active" data-proj="globe" aria-pressed="true" title="Switch to globe"><i data-lucide="globe-2"></i><span>Globe</span></button>
+              <button type="button" data-proj="flat" aria-pressed="false" title="Switch to flat map"><i data-lucide="map"></i><span>Flat map</span></button>
+            </div>
+            <button type="button" class="atlas-btn active" data-act="atlas" title="Show or hide the country atlas"><i data-lucide="list"></i><span>Atlas</span></button>
+            <button type="button" class="atlas-btn active" data-act="spin" title="Stop rotating"><i data-lucide="rotate-3d"></i></button>
+            <button type="button" class="atlas-btn" data-act="expand" title="Expand the map to full screen"><i data-lucide="maximize-2"></i><span>Expand</span></button>
+          </div>
+          <div class="atlas-layers" role="group" aria-label="Map layers">
+            <button type="button" class="atlas-chipbtn active" data-layer="country-labels"><i data-lucide="flag"></i>Countries &amp; flags</button>
+            <button type="button" class="atlas-chipbtn active" data-layer="places,country-line"><i data-lucide="map-pin"></i>Borders &amp; places</button>
+            <button type="button" class="atlas-chipbtn active" data-layer="hazards"><i data-lucide="siren"></i>Live hazards</button>
+            <button type="button" class="atlas-chipbtn" data-layer="nasa"><i data-lucide="satellite"></i>NASA daily image</button>
+          </div>
+          <aside class="atlas-panel" id="atlasPanel" aria-label="Country atlas">
+            <div class="atlas-panel-head">
+              <h3><i data-lucide="earth"></i>Atlas</h3>
+              <p id="atlasCount">Loading countries…</p>
+              <label class="atlas-search"><i data-lucide="search"></i><input type="search" id="atlasSearch" placeholder="Find a country or capital" autocomplete="off"></label>
+              <div class="atlas-regions" id="atlasRegions">
+                <button type="button" class="active" data-region="all">All</button><button type="button" data-region="Africa">Africa</button><button type="button" data-region="Americas">Americas</button><button type="button" data-region="Asia">Asia</button><button type="button" data-region="Europe">Europe</button><button type="button" data-region="Oceania">Oceania</button>
               </div>
             </div>
-
-            <!-- Live imagery layer -->
-            <label class="lv-map-toggle"><input type="checkbox" id="sat-nasa" onchange="toggleNasaGibs()"> NASA daily satellite image (GIBS)</label>
-          </div>
-
-          <div class="map-legend-box lv-map-legend">
-            <h4>Live hazard alerts (GDACS)</h4>
-            <div><i style="background:#d93025"></i>Red: severe</div>
-            <div><i style="background:#f29900"></i>Orange: moderate</div>
-            <div><i style="background:#34a853"></i>Green: minor</div>
-            <div><i style="background:#9BE07A;border:2px solid #3F8F3A"></i>Your analysed area</div>
-            <div class="lv-map-hint">Click anywhere to analyse that place</div>
+            <ul class="atlas-list" id="atlasList"></ul>
+          </aside>
+          <section class="atlas-card" id="atlasCard" hidden aria-live="polite"></section>
+          <div class="atlas-hint" id="atlasHint"></div>
+          <div class="atlas-legend">
+            <span><i style="background:#d93025"></i>Severe</span><span><i style="background:#f29900"></i>Moderate</span><span><i style="background:#34a853"></i>Minor hazard</span><span><i class="sq" style="background:#9BE07A"></i>Analysed area</span><span><i class="sq" style="background:#FFD54F"></i>Selected field</span>
           </div>
         </div>
         <div class="lv-host"></div>
@@ -579,7 +550,7 @@
             </div>
             <div class="site-search-wrapper" style="position:relative; width:260px;">
               <input type="text" id="siSearchInput" placeholder="Enter Coordinates, Region, or Farm Name..." style="width:100%; padding:12px 40px 12px 20px; border-radius:30px; border:2px solid var(--border); background:var(--bg-light); color:var(--text-dark); font-family:inherit; outline:none; transition:border-color 0.2s;">
-              <button id="siSearchBtn" style="position:absolute; right:12px; top:50%; transform:translateY(-50%); background:none; border:none; cursor:pointer; color:var(--accent-blue); font-size:18px;">🔍</button>
+              <button id="siSearchBtn" style="position:absolute; right:12px; top:50%; transform:translateY(-50%); background:none; border:none; cursor:pointer; color:var(--accent-blue); display:flex;"><i data-lucide="search"></i></button>
             </div>
           </div>
           
@@ -632,61 +603,31 @@
     </div>
 
     <div class="page" id="pg-reports"><div class="pg-pad">
-      <div class="panel"><div class="panel-hdr"><h3>📋 Reports & Analytics</h3><span class="panel-badge">Automated</span></div>
-        <div style="padding:16px;font-size:13px;line-height:1.7;color:var(--text-secondary)">
-          
-        <!-- WAFEO Report Generator Button -->
-        <div style="margin-bottom: 20px; text-align: center;">
-          <button id="btnGenerateReport" style="background: linear-gradient(135deg, var(--accent-emerald), #0b8043); color: #fff; padding: 14px 28px; font-size: 16px; font-weight: 600; border: none; border-radius: 8px; cursor: pointer; box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3); display: inline-flex; align-items: center; gap: 8px; transition: all 0.2s;">
-            <span style="font-size: 20px;">📊</span> Generate Comprehensive WAFEO Report
-          </button>
+      <div class="panel report-hero">
+        <div class="report-hero-text">
+          <h3><i data-lucide="file-text"></i>Field analysis report</h3>
+          <p id="reportHeroText">Analyse a field first (click one on the dashboard map, or use Site Intelligence). Its full report is then available here as a PDF.</p>
         </div>
-
-          <p>Reports combine the latest live site analysis (crops, water quantity and quality, soil, food security, hazards) with an AI summary and a forecast trained on the site’s real Sentinel-2 history. Analyse a farm or region first, then generate.</p>
+        <div class="report-hero-actions">
+          <button type="button" class="lv-btn report-pdf-btn" data-report-pdf><i data-lucide="file-down"></i>Download PDF report</button>
+          <button type="button" class="lv-btn-ghost" id="btnGenerateReport"><i data-lucide="eye"></i>Preview &amp; save</button>
         </div>
       </div>
-
-      <!-- ═══ NDVI + LSTM FORECAST (real-time) ═══ -->
-      <div class="panel full" id="forecastPanel" style="margin-top:20px;">
-        <div class="panel-hdr">
-          <h3>🌱 NDVI &amp; LSTM Forecast</h3>
-          <span class="panel-badge" id="fcBadge" style="background:var(--accent-emerald);">Real-time</span>
-        </div>
-        <div style="padding:16px;">
-          <div style="display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-bottom:14px;">
-            <label style="font-size:12px; font-weight:600; color:var(--text-secondary);">Region:</label>
-            <select id="fcRegion" class="emhare-select" style="max-width:240px; padding:8px 10px;">
-            </select>
-            <button id="btnRunForecast" class="fc-run-btn">▶ Run LSTM Forecast</button>
-            <span id="fcStatus" style="font-size:12px; color:var(--text-muted);"></span>
-          </div>
-          <div style="position:relative; height:300px;">
-            <canvas id="ndviForecastChart"></canvas>
-          </div>
-          <div id="fcComparison" style="display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; margin-top:16px;"></div>
-          <p style="font-size:11px; color:var(--text-muted); margin-top:12px;">
-            History is the real monthly Sentinel-2 NDVI of your analysed area (24 months). The forecast is produced in your browser by a small LSTM neural network (TensorFlow.js), with a statistical trend model as fallback.
-          </p>
-        </div>
-      </div>
-
       <!-- Live News moved here from Dashboard -->
       <div class="panel full" id="newsPanel" style="margin-top:20px;"></div>
     </div></div>
-    <div class="page" id="pg-settings"><div class="pg-pad">
-      <div class="panel"><div class="module-hero"><span class="mh-icon">⚙️</span><h3>Platform Settings</h3><p>Manage satellite data sources, alert thresholds, notification preferences, user roles, and API integrations. Configure custom NDVI thresholds for your specific crop types and regions.</p></div></div>
-      <!-- Admin User Profiles Panel -->
-      <div class="panel" id="adminUsersPanel" style="margin-top:20px; display:none;">
-        <div class="panel-hdr"><h3>👥 Registered Users</h3><span class="panel-badge" id="userCountBadge" style="background:var(--accent-blue)">0 Users</span></div>
+    <div class="page" id="pg-users"><div class="pg-pad">
+      <div class="panel" id="adminUsersPanel">
+        <div class="panel-hdr"><h3><i data-lucide="users"></i>Registered users</h3><span class="panel-badge" id="userCountBadge" style="background:var(--accent-blue)">0 users</span></div>
         <div id="userProfilesList" style="padding:12px;"></div>
       </div>
     </div></div>
-    
+
     <!-- ═══ COMPREHENSIVE / PORTFOLIO REPORT MODAL ═══ -->
     <div id="wafeoReportModal" class="modal-overlay">
       <div class="modal-card" style="max-width:760px; width:94%; max-height:88vh; display:flex; flex-direction:column;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-          <h2 style="font-size:20px; font-weight:700; color:var(--accent-blue);">📊 WAFEO Comprehensive Report</h2>
+          <h2 style="font-size:20px; font-weight:700; color:var(--accent-blue); display:flex; align-items:center; gap:8px;"><i data-lucide="file-text"></i>WAFEO field report</h2>
           <button id="btnCloseReport" style="background:none;border:none;font-size:22px;cursor:pointer;color:#888;">&times;</button>
         </div>
         <div id="reportMeta" style="font-size:12px; color:var(--text-muted); margin-bottom:12px;"></div>
@@ -694,8 +635,8 @@
           <!-- Populated by JS -->
         </div>
         <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:14px; padding-top:12px; border-top:1px solid var(--border);">
-          <button id="btnSaveReport" class="fc-run-btn">💾 Save to Records (Firestore)</button>
-          <button id="btnPrintReport" class="fc-run-btn" style="background:var(--accent-blue);">🖨 Print / Export PDF</button>
+          <button id="btnSaveReport" class="fc-run-btn"><i data-lucide="save"></i>Save to my reports</button>
+          <button type="button" class="fc-run-btn" data-report-pdf style="background:var(--accent-blue);"><i data-lucide="file-down"></i>Download PDF</button>
           <span id="reportSaveStatus" style="font-size:12px; color:var(--text-muted); align-self:center;"></span>
         </div>
         <div id="savedReportsList" style="margin-top:14px;"></div>
@@ -707,20 +648,20 @@
       <!-- The Floating Panel -->
       <div id="aiWidgetPanel">
         <div class="panel-hdr" style="background:#fff; border-bottom:1px solid var(--border); padding: 12px 16px;">
-          <h3 style="display:flex; align-items:center; gap:8px; margin:0; font-size:14px;">🤖 WAFEO Intelligence</h3>
+          <h3 style="display:flex; align-items:center; gap:8px; margin:0; font-size:14px;"><i data-lucide="sparkles"></i>WAFEO Intelligence</h3>
           <span class="panel-badge" style="background:var(--accent-emerald); font-size:10px;">WAFEO AI</span>
           <button id="aiCloseBtn" style="background:transparent; border:none; font-size:18px; cursor:pointer; margin-left:auto; color:#888;">&times;</button>
         </div>
         <div id="aiChatWindow" style="flex:1; overflow-y:auto; padding: 16px; background: var(--bg-deep); display:flex; flex-direction:column; gap: 12px;">
           <div class="chat-msg bot">
-            <div class="cm-avatar">🤖</div>
+            <div class="cm-avatar"><i data-lucide="bot"></i></div>
             <div class="cm-bubble">Hello! I am your WAFEO AI Assistant. I can help you analyze Earth Observation data, understand NDVI metrics, track water resources, and explain food security warnings on the platform. How can I assist you today?</div>
           </div>
         </div>
         <div style="padding: 12px 12px 8px 12px; border-top: 1px solid var(--border); background: #fff; display:flex; flex-direction:column; gap: 8px;">
           <div style="display:flex; gap: 8px; align-items:center; width: 100%;">
             <input type="text" id="aiInput" placeholder="Ask securely..." style="flex:1; padding: 10px 14px; border-radius: 20px; border: 1px solid #dcdcdc; outline:none; font-family:inherit; font-size: 13px; background: #f9f9f9;">
-            <button id="aiSendBtn" style="padding: 10px 16px; border-radius: 20px; border:none; background: var(--accent-blue); color:#fff; font-weight:bold; cursor:pointer; transition: background 0.2s;">Send 🚀</button>
+            <button id="aiSendBtn" style="padding: 10px 16px; border-radius: 20px; border:none; background: var(--accent-blue); color:#fff; font-weight:bold; cursor:pointer; transition: background 0.2s; display:flex; align-items:center; gap:6px;">Send <i data-lucide="send"></i></button>
           </div>
           <div style="font-size: 10px; color: #888; font-style: italic; text-align: center; margin-top:-2px;">
             This AI assistant can make mistakes, please always verify critical data and metrics.
@@ -733,7 +674,7 @@
 
 <!-- ═══════════════ FIXED FOOTER BAR ═══════════════ -->
 <div id="platformFooter" class="platform-footer">
-  <div class="footer-left">★ CREATED BY <strong>NORBERT MUZILA</strong></div>
+  <div class="footer-left">CREATED BY <strong>NORBERT MUZILA</strong></div>
   <div class="footer-center">Water&nbsp;<span class="footer-sep">|</span>&nbsp;Agriculture&nbsp;<span class="footer-sep">|</span>&nbsp;Food Security&nbsp;<span class="footer-sep">|</span>&nbsp;EO</div>
   <div class="footer-right">© 2026 <span style="color:var(--accent-blue); font-weight:700;">WAFEO</span></div>
 </div>
@@ -741,10 +682,12 @@
 <!-- ═══════════════ WATER ANALYTICS MODAL ═══════════════ -->
 
 
-<script src="app.js?v=23"></script>
-<script src="eo.js?v=6"></script>
-<script src="pages.js?v=6"></script>
+<script src="app.js?v=24"></script>
+<script src="eo.js?v=7"></script>
+<script src="atlas.js?v=2"></script>
+<script src="report.js?v=1"></script>
+<script src="pages.js?v=7"></script>
 <script src="https://cdn.jsdelivr.net/npm/lenis@1.1.13/dist/lenis.min.js"></script>
-<script src="landing.js?v=2"></script>
+<script src="landing.js?v=3"></script>
 </body>
 </html>

@@ -326,3 +326,20 @@
 #loginScreen.lp-arrive .login-card-simple { animation: lp-cardIn 1s cubic-bezier(0.22, 1, 0.36, 1) 0.25s both; }
 @keyframes lp-cardIn { from { opacity: 0; transform: translateY(28px) scale(0.98); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { #loginScreen.lp-arrive .login-card-simple { animation: none; } }
+
+/* ─── Nav calls to action: Try the demo · Sign up · Sign in ─── */
+.lp-nav-ctas { display: flex; align-items: center; gap: 8px; }
+.lp-btn[hidden] { display: none !important; }
+.lp-btn i[data-lucide], .lp-btn svg.lucide { width: 16px; height: 16px; }
+.lp-btn-demo { background: rgba(255, 213, 79, 0.16); color: inherit; border: 1px solid rgba(255, 213, 79, 0.65); backdrop-filter: blur(8px); }
+.lp-btn-demo:hover { background: rgba(255, 213, 79, 0.3); }
+.lp-btn-demo:hover svg.lucide { transform: none; }
+.lp-nav.solid .lp-btn-demo { color: var(--lp-ink); background: #FFF4CC; }
+.lp-nav.solid .lp-btn-ghost { color: var(--lp-ink); border-color: var(--lp-line); background: transparent; }
+.lp-final .lp-btn-demo { color: var(--lp-bone); }
+.lp-home-link svg.lucide { width: 14px; height: 14px; }
+@media (max-width: 720px) {
+  .lp-nav-signup { display: none; }
+  .lp-nav-ctas { gap: 6px; }
+  .lp-nav .lp-btn { padding: 8px 12px; font-size: 12.5px; }
+}

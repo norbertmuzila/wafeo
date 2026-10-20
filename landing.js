@@ -14,6 +14,7 @@
   const smooth = (a, b, v) => { const t = clamp((v - a) / (b - a)); return t * t * (3 - 2 * t); };
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const loggedIn = () => typeof currentUser !== 'undefined' && !!currentUser;
+  const realAccount = () => loggedIn() && currentUser.role !== 'demo';
 
   const hero = $('#lp-top');
   const stage = $('#lpStage');
@@ -91,7 +92,10 @@
     const go = e.target.closest('[data-lp-goto]');
     if (go) { e.preventDefault(); scrollToY(targetY(go.dataset.lpGoto)); return; }
     const enterBtn = e.target.closest('[data-lp-enter]');
-    if (enterBtn) { e.preventDefault(); enterPlatform(enterBtn.dataset.lpEnter || ''); }
+    if (enterBtn) { e.preventDefault(); enterPlatform(enterBtn.dataset.lpEnter || ''); return; }
+    // "Try the demo": straight into the platform, no account or sign-in.
+    const demoBtn = e.target.closest('[data-lp-demo]');
+    if (demoBtn) { e.preventDefault(); enterPlatform(loggedIn() ? '' : 'demo'); }
   });
 
   // ─── Section rail ───────────────────────────────────────────
@@ -398,7 +402,8 @@
     $$('[data-lp-cta-label]').forEach((el, i) => {
       el.textContent = signedIn ? 'Open dashboard' : (i === 0 ? 'Sign in' : 'Enter the platform');
     });
-    $$('[data-lp-enter="register"]').forEach(el => { el.hidden = signedIn; });
+    $$('[data-lp-enter="register"]').forEach(el => { el.hidden = realAccount(); });
+    $$('[data-lp-demo]').forEach(el => { el.hidden = signedIn; });
   }
 
   function openPendingPage() {
@@ -412,8 +417,12 @@
     if (gone) return;
     gone = true;
     if (lenis) lenis.stop();
-    try { history.replaceState(null, '', '#app'); } catch (e) {}
     const login = document.getElementById('loginScreen');
+    if (mode === 'demo') {
+      root.classList.add('lp-gone');
+      if (typeof window.wafeoStartDemo === 'function') window.wafeoStartDemo();
+      return;
+    }
     if (login && !loggedIn()) {
       login.classList.remove('lp-arrive'); void login.offsetWidth; login.classList.add('lp-arrive');
     }
@@ -434,15 +443,25 @@
     update();
   }
   window.wafeoShowHome = showHome;
+  window.wafeoLanding = {
+    hide: () => enterPlatform(''),
+    // Used when the demo cannot start: fall back to the sign-in screen.
+    showLogin: () => { gone = false; enterPlatform(''); }
+  };
 
   document.addEventListener('wafeo:auth', () => { updateCtas(); openPendingPage(); });
 
-  // #app in the URL (e.g. after logout or a refresh inside the app) skips the landing.
+  // The landing page always opens first. An old "#app" link is tidied away.
   if (window.location.hash === '#app') {
-    gone = true;
-    root.classList.add('lp-gone');
-    if (lenis) lenis.stop();
+    try { history.replaceState(null, '', window.location.pathname + window.location.search); } catch (e) {}
   }
+  // Leaving the demo to create an account goes straight to sign-up.
+  try {
+    if (sessionStorage.getItem('wafeo.openRegister')) {
+      sessionStorage.removeItem('wafeo.openRegister');
+      setTimeout(() => enterPlatform('register'), 300);
+    }
+  } catch (e) {}
 
   updateCtas();
   update();

@@ -3,7 +3,7 @@
 const express = require('express');
 const config = require('../config');
 const store = require('../store');
-const { requireAuth, requireRole, rateLimit, publicUser } = require('../auth');
+const { requireAuth, requireRole, rateLimit, publicUser, denyDemo } = require('../auth');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -12,8 +12,11 @@ router.use(requireAuth);
 const SYSTEM_PROMPT = 'You are the WAFEO Digital Twin AI Assistant. You help users interpret Earth Observation data: NDVI vegetation health, water resources, drought, soil and food-security signals across Africa and globally. Be concise, professional and clear. Prefer short paragraphs and bullet points. If asked something outside Earth observation/agriculture/water/food security, answer briefly and steer back to the platform.';
 
 const aiLimiter = rateLimit({ windowMs: 60 * 1000, max: 20, key: req => 'u' + req.user.id });
+// Demo sessions are free to create, so they share a per-IP allowance too.
+const demoAiLimiter = rateLimit({ windowMs: 60 * 60 * 1000, max: 40, key: req => 'ai-demo' + req.ip });
+const aiLimit = (req, res, next) => (req.user.role === 'demo' ? demoAiLimiter(req, res, () => aiLimiter(req, res, next)) : aiLimiter(req, res, next));
 
-router.post('/ai/chat', aiLimiter, async (req, res) => {
+router.post('/ai/chat', aiLimit, async (req, res) => {
   const raw = Array.isArray(req.body && req.body.messages) ? req.body.messages : null;
   if (!raw) return res.status(400).json({ error: 'messages array required' });
 
@@ -63,7 +66,7 @@ router.post('/ai/chat', aiLimiter, async (req, res) => {
 });
 
 // ─── Reports ─────────────────────────────────────────────────
-router.post('/reports', async (req, res) => {
+router.post('/reports', denyDemo, async (req, res) => {
   const body = req.body || {};
   const report = {
     userId: req.user.id,
@@ -85,6 +88,7 @@ router.post('/reports', async (req, res) => {
 });
 
 router.get('/reports', async (req, res) => {
+  if (req.user.role === 'demo') return res.json({ reports: [], total: 0 });
   try {
     const reports = await store.listReports(req.user.id);
     res.json({ reports, total: reports.length });
@@ -96,6 +100,7 @@ router.get('/reports', async (req, res) => {
 
 // ─── Activity log ────────────────────────────────────────────
 router.post('/activity/log', async (req, res) => {
+  if (req.user.role === 'demo') return res.json({ logged: false });
   const { action, details } = req.body || {};
   try {
     await store.logActivity({

@@ -358,7 +358,9 @@ function interpret(d) {
   if (d.hazards?.available) {
     for (const e of d.hazards.events.slice(0, 6)) {
       const sev = e.alert === 'red' ? 'critical' : e.alert === 'orange' ? 'high' : e.distanceKm <= 150 ? 'low' : null;
-      if (sev) add('hazard', sev, `${e.type} alert (${e.alert}) ${e.distanceKm} km away`, `${e.name || e.type} in ${e.country}${e.severity ? ': ' + e.severity : ''}. Active ${String(e.from).slice(0, 10)} to ${String(e.to).slice(0, 10)}.`, 'GDACS');
+      // GDACS names often already list the countries ("Drought in Cuba, ...").
+      const what = e.name && e.country && e.name.includes(e.country.split(',')[0].trim()) ? e.name : `${e.name || e.type} in ${e.country}`;
+      if (sev) add('hazard', sev, `${e.type} alert (${e.alert}) ${e.distanceKm} km away`, `${what}${e.severity ? ': ' + e.severity : ''}. Active ${String(e.from).slice(0, 10)} to ${String(e.to).slice(0, 10)}.`, 'GDACS');
     }
   }
 

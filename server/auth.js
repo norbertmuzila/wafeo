@@ -40,6 +40,19 @@ function signToken(user) {
   );
 }
 
+// Visitors exploring without an account get a short-lived "demo" session.
+function signDemoToken() {
+  const id = 'demo-' + crypto.randomBytes(6).toString('hex');
+  const user = { id, username: 'demo', role: 'demo', name: 'Demo visitor', email: '' };
+  return { token: jwt.sign(user, config.jwtSecret, { expiresIn: '12h' }), user: { ...user, demo: true } };
+}
+
+// Blocks actions that would write to the database for demo sessions.
+function denyDemo(req, res, next) {
+  if (req.user && req.user.role === 'demo') return res.status(403).json({ error: 'Create a free account or sign in with Google to save your work.' });
+  next();
+}
+
 function requireAuth(req, res, next) {
   const header = req.headers.authorization || '';
   const token = header.startsWith('Bearer ') ? header.slice(7).trim() : '';
@@ -77,4 +90,4 @@ function rateLimit({ windowMs, max, key = req => req.ip }) {
   };
 }
 
-module.exports = { hashPassword, verifyPassword, publicUser, signToken, requireAuth, requireRole, rateLimit };
+module.exports = { hashPassword, verifyPassword, publicUser, signToken, signDemoToken, denyDemo, requireAuth, requireRole, rateLimit };

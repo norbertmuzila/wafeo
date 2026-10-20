@@ -10,7 +10,8 @@
   const esc = s => (typeof escapeHtml === 'function' ? escapeHtml(s) : String(s ?? ''));
   const fmt = (v, d = 2) => (v === null || v === undefined || v === '' ? '—' : typeof v === 'number' ? Number(v.toFixed(d)).toLocaleString(undefined, { maximumFractionDigits: d }) : esc(v));
 
-  const state = { mode: 'point', radius: 1000, point: null, drawPts: [], busy: false, last: null };
+  const state = { mode: 'field', radius: 1000, point: null, field: null, drawPts: [], busy: false, last: null };
+  const FIELD_ZOOM = 13; // clicks at this zoom or closer trace the field outline
   const layers = { aoi: null, draft: null, vertices: [] };
 
   const SCHEMA = 3; // must match server/services/eo/analyze.js
@@ -20,11 +21,11 @@
 
   // ─── Labels ───────────────────────────────────────────────
   const DOMAINS = [
-    ['crop', 'Crop condition', '🌱'],
-    ['waterQuantity', 'Water quantity', '💧'],
-    ['waterQuality', 'Water quality', '🧪'],
-    ['soil', 'Soil', '🟫'],
-    ['land', 'Land & terrain', '⛰️']
+    ['crop', 'Crop condition', 'sprout'],
+    ['waterQuantity', 'Water quantity', 'droplets'],
+    ['waterQuality', 'Water quality', 'flask-conical'],
+    ['soil', 'Soil', 'layers'],
+    ['land', 'Land & terrain', 'mountain']
   ];
   const METRIC_LABELS = {
     ndvi: 'NDVI (vegetation vigour)', ndviP10: 'NDVI, weakest 10%', ndviP90: 'NDVI, best 10%', evi: 'EVI', savi: 'SAVI (soil-adjusted)',
@@ -59,6 +60,7 @@
     land: ['croplandPct', 'elevationM', 'slopeMeanDeg', 'steepPct']
   };
   const statusClass = s => (/good|low risk/i.test(s) ? 'optimal' : /fair|moderate/i.test(s) ? 'watch' : /poor|critical|high/i.test(s) ? 'concern' : 'neutral');
+  const ico = name => `<i data-lucide="${name}"></i>`;
   const sevClass = s => ({ critical: 'concern', high: 'concern', medium: 'watch', low: 'neutral', info: 'optimal' }[s] || 'neutral');
 
   function metricValue(k, v) {
@@ -77,10 +79,11 @@
     bar.className = 'eo-toolbar';
     bar.innerHTML = `
       <div class="eo-seg" role="group" aria-label="How to choose the area">
-        <button type="button" class="eo-seg-btn active" data-mode="point">📍 Point + radius</button>
-        <button type="button" class="eo-seg-btn" data-mode="draw">✏️ Draw farm boundary</button>
+        <button type="button" class="eo-seg-btn active" data-mode="field"><i data-lucide="mouse-pointer-click"></i>Click a field</button>
+        <button type="button" class="eo-seg-btn" data-mode="point"><i data-lucide="locate-fixed"></i>Point + radius</button>
+        <button type="button" class="eo-seg-btn" data-mode="draw"><i data-lucide="pencil-line"></i>Draw boundary</button>
       </div>
-      <label class="eo-radius" data-for="point">Radius
+      <label class="eo-radius" data-for="point" hidden>Radius
         <select id="eoRadius">
           <option value="250">250 m (small plot)</option><option value="500">500 m</option>
           <option value="1000" selected>1 km (farm)</option><option value="2000">2 km</option>
@@ -91,8 +94,8 @@
         <button type="button" class="eo-btn-ghost" id="eoUndo">Undo point</button>
         <button type="button" class="eo-btn-ghost" id="eoClear">Clear</button>
       </div>
-      <button type="button" class="eo-btn" id="eoRun">Analyse with satellites</button>
-      <span class="eo-hint" id="eoHint">Search a place or click the map to choose a farm, then press Analyse.</span>`;
+      <button type="button" class="eo-btn" id="eoRun"><i data-lucide="satellite"></i>Analyse with satellites</button>
+      <span class="eo-hint" id="eoHint">Zoom in on the map until you can see fields, then click inside one to select it.</span>`;
     header.insertBefore(bar, header.querySelector('.si-tabs'));
 
     bar.querySelectorAll('.eo-seg-btn').forEach(b => b.addEventListener('click', () => setMode(b.dataset.mode)));
@@ -126,8 +129,10 @@
     document.querySelectorAll('#eoToolbar .eo-seg-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
     document.querySelector('#eoToolbar [data-for="point"]').hidden = mode !== 'point';
     document.querySelector('#eoToolbar [data-for="draw"]').hidden = mode !== 'draw';
-    hint(mode === 'draw' ? 'Click the map at each corner of your farm (at least 3), then press Analyse.' : 'Search a place or click the map to choose a farm, then press Analyse.');
-    if (mode === 'draw') { clearAoi(); drawDraft(); } else { clearDraft(); if (state.point) drawPointAoi(); }
+    hint(mode === 'draw' ? 'Click the map at each corner of your farm (at least 3), then press Analyse.'
+      : mode === 'field' ? 'Zoom in on the map until you can see fields, then click inside one to select it.'
+      : 'Search a place or click the map to choose a farm, then press Analyse.');
+    if (mode === 'draw') { clearAoi(); drawDraft(); } else { clearDraft(); clearAoi(); if (mode === 'point' && state.point) drawPointAoi(); if (mode === 'field' && state.field) drawFieldAoi(); }
   }
 
   function hint(text, isError) {
@@ -149,6 +154,37 @@
     clearAoi();
     layers.aoi = L.circle([state.point.lat, state.point.lon], { radius: state.radius, color: '#9BE07A', weight: 2, fillOpacity: 0.12 }).addTo(siMap);
   }
+  function drawFieldAoi() {
+    if (!mapReady() || !state.field) return;
+    clearAoi();
+    layers.aoi = L.polygon(state.field.coordinates[0].map(([x, y]) => [y, x]), { color: '#FFD54F', weight: 2.5, dashArray: '6 4', fillOpacity: 0.15 }).addTo(siMap);
+  }
+
+  // Trace the field under a click from the latest clear Sentinel-2 image.
+  async function selectField(lat, lon) {
+    if (mapReady() && siMap.getZoom() < FIELD_ZOOM) {
+      siMap.flyTo([lat, lon], 15, { duration: 1.2 });
+      return hint('Zoomed in. Now click inside the field you want to analyse.');
+    }
+    state.field = null; clearAoi();
+    hint('Finding the field edges from the latest satellite image…');
+    try {
+      const res = await fetch(`${API}/eo/field?lon=${lon.toFixed(6)}&lat=${lat.toFixed(6)}`, { headers: authHeaders(), signal: AbortSignal.timeout(60000) });
+      if (res.status === 401 && typeof handleExpiredSession === 'function') return handleExpiredSession();
+      const r = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(r.error || 'Field tracing failed.');
+      if (!r.found) {
+        state.point = { lat, lon };
+        return hint(r.reason + ' You can switch to "Point + radius" or "Draw boundary".', true);
+      }
+      state.field = r.geometry;
+      drawFieldAoi();
+      hint(`Field selected: ${r.areaHa.toLocaleString()} ha (outline from the ${r.sceneDate} Sentinel-2 image). Press Analyse.`);
+    } catch (e) {
+      hint(e.name === 'TimeoutError' ? 'The satellite service took too long. Try again, or draw the field.' : e.message, true);
+    }
+  }
+
   function drawDraft() {
     if (!mapReady()) return;
     clearDraft();
@@ -170,6 +206,7 @@
     buildToolbar();
     if (typeof initSiGlobalMap === 'function') initSiGlobalMap();
     if (query && typeof query === 'object' && Number.isFinite(query.lat)) {
+      if (state.mode === 'field') return selectField(query.lat, query.lon);
       if (state.mode === 'draw') { state.drawPts.push({ lat: query.lat, lon: query.lon }); drawDraft(); return; }
       state.point = { lat: query.lat, lon: query.lon };
       drawPointAoi();
@@ -182,9 +219,14 @@
         const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=1`);
         const g = await res.json();
         if (!g.length) return hint(`"${query}" was not found. Try a nearby town or click the map.`, true);
+        const lat = parseFloat(g[0].lat), lon = parseFloat(g[0].lon);
+        if (state.mode === 'field') {
+          if (mapReady()) siMap.flyTo([lat, lon], 15, { duration: 1.2 });
+          return hint(`Found ${query}. Click inside a field to select it.`);
+        }
         setMode('point');
-        state.point = { lat: parseFloat(g[0].lat), lon: parseFloat(g[0].lon) };
-        if (mapReady()) siMap.flyTo([state.point.lat, state.point.lon], 13, { duration: 1.2 });
+        state.point = { lat, lon };
+        if (mapReady()) siMap.flyTo([lat, lon], 13, { duration: 1.2 });
         drawPointAoi();
         return run();
       } catch (e) {
@@ -204,6 +246,9 @@
       const ring = state.drawPts.map(p => [p.lon, p.lat]);
       ring.push([...ring[0]]);
       body = { geometry: { type: 'Polygon', coordinates: [ring] } };
+    } else if (state.mode === 'field') {
+      if (!state.field) return hint('Zoom in and click inside a field to select it first.', true);
+      body = { geometry: state.field };
     } else {
       if (!state.point) return hint('Search a place or click the map to choose the area first.', true);
       body = { point: [state.point.lon, state.point.lat], radius_m: state.radius };
@@ -211,7 +256,7 @@
 
     state.busy = true;
     const btn = document.getElementById('eoRun');
-    btn.disabled = true; btn.textContent = 'Analysing…';
+    btn.disabled = true; btn.innerHTML = '<i data-lucide="loader-circle" class="spin"></i>Analysing…';
     const overlay = document.getElementById('siScanOverlay');
     const overlayText = overlay && overlay.querySelector('div:last-child');
     if (overlay) overlay.style.opacity = '1';
@@ -224,14 +269,14 @@
       if (!data) return;
       showResultAoi(data.aoi.geometry);
       renderSite(data);
-      hint(`Analysed ${data.aoi.areaHa.toLocaleString()} ha. Results are also on the Crop, Soil, Water and Drought pages and in Reports.`);
+      hint(`Analysed ${data.aoi.areaHa.toLocaleString()} ha. Results are also on the Crop, Soil, Water and Drought pages; download the PDF report from the Overview tab or Reports.`);
     } catch (e) {
       hint(e.name === 'TimeoutError' ? 'The satellite services took too long. Please try again.' : e.message, true);
     } finally {
       clearInterval(ticker);
       if (overlay) overlay.style.opacity = '0';
       if (overlayText) overlayText.textContent = 'Acquiring Satellite Telemetry...';
-      btn.disabled = false; btn.textContent = 'Analyse with satellites';
+      btn.disabled = false; btn.innerHTML = '<i data-lucide="satellite"></i>Analyse with satellites';
       state.busy = false;
     }
   }
@@ -274,6 +319,7 @@
 
     // Overview
     document.getElementById('siMetricsGrid').innerHTML = `
+      <button type="button" class="lv-btn report-pdf-btn" data-report-pdf>${ico('file-down')}Download PDF report</button>
       <div class="si-card eo-overall eo-${statusClass(a.overall.riskLevel)}">
         <div class="si-card-hdr"><div class="si-card-title">Overall assessment</div><span class="si-badge ${statusClass(a.overall.riskLevel)}">${esc(a.overall.riskLevel)} risk</span></div>
         <div class="eo-headline">${esc(a.overall.headline)}</div>
@@ -308,7 +354,7 @@
     const metrics = (keys || []).filter(k => d.metrics && d.metrics[k] !== undefined && d.metrics[k] !== null).slice(0, 4)
       .map(k => `<div><span>${esc(METRIC_LABELS[k] || k)}</span><b>${metricValue(k, d.metrics[k])}</b></div>`).join('');
     return `<div class="si-card">
-      <div class="si-card-hdr"><div class="si-card-title">${icon} ${esc(title)}</div><span class="si-badge ${statusClass(d.status)}">${esc(d.status)}${Number.isFinite(d.score) ? ' · ' + d.score : ''}</span></div>
+      <div class="si-card-hdr"><div class="si-card-title">${ico(icon)} ${esc(title)}</div><span class="si-badge ${statusClass(d.status)}">${esc(d.status)}${Number.isFinite(d.score) ? ' · ' + d.score : ''}</span></div>
       <div class="si-card-desc">${esc(d.summary)}</div>
       ${metrics ? `<div class="eo-kv">${metrics}</div>` : ''}
     </div>`;
@@ -324,12 +370,12 @@
   function guidanceHtml(rec) {
     const block = (who, title, icon) => `
       <div class="eo-guide">
-        <h4 class="eo-h4">${icon} ${title}</h4>
+        <h4 class="eo-h4">${ico(icon)} ${title}</h4>
         <ol class="eo-actions">${(rec[who] || []).map(r => `
           <li><div class="eo-action"><span class="si-badge ${sevClass(r.severity)}">${r.severity === 'info' ? 'routine' : esc(r.severity)}</span> ${esc(r.action)}</div>
           <div class="eo-why">Why: ${esc(r.why)}</div></li>`).join('')}</ol>
       </div>`;
-    return block('farmers', 'Farmers', '👩🏾‍🌾') + block('government', 'Government & extension', '🏛️') + block('public', 'Public', '👥') +
+    return block('farmers', 'Farmers', 'tractor') + block('government', 'Government & extension', 'landmark') + block('public', 'Public', 'users') +
       '<p class="eo-note">Guidance is generated from satellite, soil and weather data for this area. Confirm field decisions with local extension officers (e.g. AGRITEX) and official advisories.</p>';
   }
 
@@ -361,11 +407,10 @@
       const d = a.domains[k];
       if (!d) return '';
       const rows = Object.entries(d.metrics || {}).filter(([, v]) => v !== null && v !== undefined).map(([mk, v]) => `<tr><td style="padding:3px 8px;color:#555">${esc(METRIC_LABELS[mk] || mk)}</td><td style="padding:3px 8px;font-weight:600">${metricValue(mk, v)}</td></tr>`).join('');
-      return `<div style="${box}"><div style="font-weight:700">${icon} ${esc(title)} — ${esc(d.status)}${Number.isFinite(d.score) ? ` (${d.score}/100)` : ''}</div><p style="margin:6px 0">${esc(d.summary)}</p>${rows ? `<table style="border-collapse:collapse;font-size:12px">${rows}</table>` : ''}</div>`;
+      return `<div style="${box}"><div style="font-weight:700">${esc(title)} — ${esc(d.status)}${Number.isFinite(d.score) ? ` (${d.score}/100)` : ''}</div><p style="margin:6px 0">${esc(d.summary)}</p>${rows ? `<table style="border-collapse:collapse;font-size:12px">${rows}</table>` : ''}</div>`;
     }).join('');
     const issues = a.issues.map(i => `<li><b>[${esc(i.severity)}] ${esc(i.title)}</b> — ${esc(i.detail)} <i style="color:#777">(${esc(i.evidence)})</i></li>`).join('');
     const guide = ['farmers', 'government', 'public'].map((w, n) => `<h5 style="margin:10px 0 4px">${['For farmers', 'For government & extension', 'For the public'][n]}</h5><ol>${a.recommendations[w].map(r => `<li>${esc(r.action)} <span style="color:#777">— ${esc(r.why)}</span></li>`).join('')}</ol>`).join('');
-    const src = a.sources.map(s => `<li>${esc(s.name)} (${esc(s.provider)}): <b>${esc(s.status)}</b>${s.detail ? ' · ' + esc(s.detail) : ''}</li>`).join('');
     return `
       <h4>Satellite Site Assessment — ${esc([p.name, p.admin1, p.country].filter(Boolean).join(', '))}</h4>
       <p style="font-size:12px;color:#666">${a.aoi.areaHa.toLocaleString()} ha · centre ${a.aoi.centroid[1].toFixed(4)}, ${a.aoi.centroid[0].toFixed(4)} · analysed ${esc(new Date(a.generatedAt).toLocaleString())}</p>
@@ -373,7 +418,6 @@
       <h4>Priority findings</h4>${issues ? `<ol>${issues}</ol>` : '<p>No warning signs detected.</p>'}
       <h4>Crop, water, soil and land</h4>${domains}
       <h4>Recommended actions (in priority order)</h4>${guide}
-      <h4>Data sources</h4><ul style="font-size:12px">${src}</ul>
       <p style="font-size:11px;color:#777">Satellites measure sediment and algae in water but not bacteria, heavy metals, salinity or pH; confirm with field samples. Soil values are 250 m model estimates; confirm with a soil test before liming or fertilising.</p>`;
   }
 
@@ -397,8 +441,7 @@
         { heading: 'Priority findings', items: a.issues.map(i => `[${i.severity}] ${i.title}: ${i.detail}`) },
         { heading: 'Actions for farmers', items: a.recommendations.farmers.map(r => r.action) },
         { heading: 'Actions for government', items: a.recommendations.government.map(r => r.action) },
-        { heading: 'Actions for the public', items: a.recommendations.public.map(r => r.action) },
-        { heading: 'Sources', items: a.sources.map(s => `${s.name}: ${s.status}${s.detail ? ' (' + s.detail + ')' : ''}`) }
+        { heading: 'Actions for the public', items: a.recommendations.public.map(r => r.action) }
       ]
     };
   }
@@ -417,7 +460,7 @@
   }
   const siteName = () => { const p = state.last && state.last.data.place; return p ? [p.name, p.country].filter(Boolean).join(', ') : null; };
 
-  window.wafeoSite = { analyze, run, analyzeArea, geocode, openSiteIntelligence, last: () => state.last, siteName, ndviSeries, reportHtml, reportPromptContext, reportData, labels: METRIC_LABELS, metricValue, sevClass, statusClass };
+  window.wafeoSite = { analyze, run, analyzeArea, geocode, openSiteIntelligence, last: () => state.last, siteName, ndviSeries, reportHtml, reportPromptContext, reportData, labels: METRIC_LABELS, domains: DOMAINS, metricValue, sevClass, statusClass };
 
   // Draw saved results once the app is ready.
 })();
