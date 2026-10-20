@@ -14,7 +14,9 @@ const fewsCache = new Map();
 
 function pickUnitRows(rows, place) {
   const parts = r => String(r.geographic_unit_full_name || '').split(',').map(x => x.trim().toLowerCase());
-  const has = name => name && rows.filter(r => parts(r).includes(name.toLowerCase()));
+  // OpenStreetMap says "Midlands Province" or "Gweru District"; FEWS NET says "Midlands", "Gweru".
+  const clean = n => String(n || '').toLowerCase().replace(/\s+(province|district|region|county|rural district|urban)$/, '').trim();
+  const has = name => name && rows.filter(r => parts(r).map(clean).includes(clean(name)));
   for (const [level, name] of [['district', place.name], ['province', place.admin1]]) {
     const found = has(name);
     if (found && found.length) return { level, name, rows: found };
