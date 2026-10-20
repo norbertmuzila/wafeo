@@ -70,8 +70,8 @@
 .lp-nav { position: fixed; top: 0; left: 0; right: 0; z-index: 30; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: calc(18px + env(safe-area-inset-top, 0px)) clamp(16px, 4vw, 40px) 18px; transition: background 0.5s, padding 0.5s var(--lp-ease), border-color 0.5s, color 0.5s; border-bottom: 1px solid transparent; color: var(--lp-bone); }
 .lp-nav.solid { background: rgba(244, 241, 232, 0.78); backdrop-filter: blur(14px) saturate(1.2); -webkit-backdrop-filter: blur(14px) saturate(1.2); border-bottom-color: var(--lp-line); color: var(--lp-ink); padding-top: calc(12px + env(safe-area-inset-top, 0px)); padding-bottom: 12px; }
 .lp-brand { display: flex; align-items: center; gap: 12px; cursor: pointer; }
-.lp-brand img { height: 34px; width: auto; filter: drop-shadow(0 2px 10px rgba(0,0,0,0.35)); transition: transform 0.5s var(--lp-ease); }
-.lp-nav.solid .lp-brand img { filter: none; }
+.lp-brand img { height: 40px; width: auto; display: block; background: #fff; border-radius: 10px; padding: 6px 10px; box-shadow: 0 4px 18px rgba(0,0,0,0.28); transition: transform 0.5s var(--lp-ease); }
+.lp-nav.solid .lp-brand img { box-shadow: 0 1px 4px rgba(15, 42, 34, 0.12); }
 .lp-brand:hover img { transform: scale(1.06); }
 .lp-brand span { font-family: var(--lp-sans); font-size: 16px; letter-spacing: 0.3em; font-weight: 700; }
 .lp-links { display: flex; gap: 32px; font-size: 14px; }

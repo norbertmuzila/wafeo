@@ -137,9 +137,8 @@
       doc.autoTable({
         startY: y, head: head ? [head.map(safe)] : undefined, body: body.map(r => r.map(safe)), margin: { left: MARGIN, right: MARGIN, bottom: MARGIN + 8 },
         theme: 'grid',
-        styles: { font: 'helvetica', fontSize: PT, cellPadding: 1.8, textColor: DARK, lineColor: [210, 214, 218], lineWidth: 0.2, valign: 'top', overflow: 'linebreak' },
+        styles: { font: 'helvetica', fontSize: PT, fillColor: false, cellPadding: 1.8, textColor: DARK, lineColor: [210, 214, 218], lineWidth: 0.2, valign: 'top', overflow: 'linebreak' },
         headStyles: { fillColor: GREEN, textColor: 255, fontStyle: 'bold' },
-        alternateRowStyles: { fillColor: [246, 248, 246] },
         columnStyles: opts.columnStyles || {},
         didParseCell: opts.didParseCell
       });
@@ -172,12 +171,55 @@
     w.y = y1 + 10;
   }
 
+  // ─── Logo watermark ───────────────────────────────────────
+  // The WAFEO logo as vector paths (same shapes as assets/wafeo-logo.svg),
+  // so the watermark stays sharp at any zoom or print size.
+  const LOGO = {
+    box: [185, 352, 1075, 390],
+    parts: [
+      ['#0070C0', 'M197 366H315L482 613L521 565L575 643C560 679 530 718 490 727C462 732 436 718 420 698Z'],
+      ['#0070C0', 'M604 430L644 364H758C730 410 690 468 661 515Z'],
+      ['#0070C0', 'M945 500H1152L1086 595H938V723H847V647Z'],
+      ['#000000', 'M415 366H536L690 605C693 610 696 613 698 613C702 609 718 580 730 563C760 522 800 465 842 407C860 382 888 366 920 366H1247L1180 460H923C918 460 914 463 912 466L768 685C752 708 735 728 700 728C672 728 660 716 650 702Z'],
+      ['#000000', 'M642 527L745 530V539L648 538Z']
+    ]
+  };
+  function drawLogo(doc, x, y, width, opacity) {
+    const [bx, by, bw] = LOGO.box, k = width / bw;
+    const X = v => x + (v - bx) * k, Y = v => y + (v - by) * k;
+    doc.saveGraphicsState();
+    doc.setGState(new doc.GState({ opacity, 'stroke-opacity': opacity }));
+    for (const [color, d] of LOGO.parts) {
+      doc.setFillColor(color);
+      const t = d.match(/[MHVLCZ]|-?\d+(?:\.\d+)?/g);
+      let i = 0, cx = 0, cy = 0, cmd = null;
+      const n = () => Number(t[i++]);
+      while (i < t.length) {
+        if (/^[MHVLCZ]$/.test(t[i])) cmd = t[i++];
+        if (cmd === 'M') { cx = n(); cy = n(); doc.moveTo(X(cx), Y(cy)); cmd = 'L'; }
+        else if (cmd === 'L') { cx = n(); cy = n(); doc.lineTo(X(cx), Y(cy)); }
+        else if (cmd === 'H') { cx = n(); doc.lineTo(X(cx), Y(cy)); }
+        else if (cmd === 'V') { cy = n(); doc.lineTo(X(cx), Y(cy)); }
+        else if (cmd === 'C') { const a = [n(), n(), n(), n(), n(), n()]; doc.curveTo(X(a[0]), Y(a[1]), X(a[2]), Y(a[3]), X(a[4]), Y(a[5])); cx = a[4]; cy = a[5]; }
+        else if (cmd === 'Z') { doc.close(); if (i < t.length && !/^[MHVLCZ]$/.test(t[i])) break; }
+        else break;
+      }
+      doc.fill();
+    }
+    doc.restoreGraphicsState();
+  }
+  // Large and faint, centred on the page, drawn before the page content.
+  const WATERMARK_W = 160;
+  const watermark = doc => drawLogo(doc, (PAGE_W - WATERMARK_W) / 2, (PAGE_H - WATERMARK_W * LOGO.box[3] / LOGO.box[2]) / 2, WATERMARK_W, 0.07);
+
   // ─── Report ───────────────────────────────────────────────
   async function build(a) {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF({ unit: 'mm', format: 'a4', compress: true });
     const title = fileTitle(a);
     doc.setProperties({ title, subject: 'WAFEO field analysis report', creator: 'WAFEO', author: 'WAFEO' });
+    watermark(doc);
+    doc.internal.events.subscribe('addPage', () => watermark(doc));
     const w = writer(doc, title);
     const site = window.wafeoSite, explain = (window.wafeoLive && window.wafeoLive.explain) || {};
     const label = k => PDF_LABELS[k] || clean((explain[k] && explain[k].label) || site.labels[k] || k);
@@ -259,7 +301,9 @@
       if (!d) return;
       w.heading(`${t}: ${clean(d.status)}${Number.isFinite(d.score) ? ` (${d.score}/100)` : ''}`, 2);
       w.para(d.summary);
-      const rows = Object.entries(d.metrics || {}).filter(([, v]) => v !== null && v !== undefined && v !== '')
+      // In the dry season, percent-of-normal rainfall is misleading (tiny normals), as on the pages.
+      const dryHidden = d.metrics && d.metrics.season ? ['rain90PctNormal', 'rain30PctNormal', 'spi90'] : [];
+      const rows = Object.entries(d.metrics || {}).filter(([mk, v]) => v !== null && v !== undefined && v !== '' && !dryHidden.includes(mk))
         .map(([mk, v]) => [label(mk), valueWithUnit(mk, v), clean((explain[mk] && explain[mk].plain) || PDF_PLAIN[mk] || '')]);
       if (rows.length) w.table(['Reading', 'Value', 'What it means'], rows, { columnStyles: { 0: { cellWidth: 55 }, 1: { cellWidth: 40 } } });
     });

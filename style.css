@@ -681,14 +681,13 @@ body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--bg-deep); c
 .waf-brand { display: inline-flex; align-items: center; gap: 12px; }
 .waf-logo-img {
   height: 46px; width: auto; display: block; object-fit: contain;
-  background: #ffffff; border-radius: 8px; padding: 2px;
-  image-rendering: -webkit-optimize-contrast;
+  background: #ffffff; border-radius: 8px; padding: 6px 8px;
 }
 /* Dashboard sidebar (240px) — shrink so the brand fits fully and is not clipped */
 .sidebar .sb-header { overflow: visible; padding-left: 14px; padding-right: 10px; }
 .sidebar .waf-brand { gap: 8px; transform: translateX(4px); }
 .sidebar .waf-logo-img {
-  height: 32px; border: 1px solid #e2e8f0; box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  height: 32px; padding: 4px 6px; border: 1px solid #e2e8f0; box-shadow: 0 2px 8px rgba(0,0,0,0.05);
 }
 .sidebar .waf-logo-box { transform: none !important; height: 32px; }
 .sidebar .waf-logo-box span { padding: 0 7px; font-size: 15px; }
