@@ -65,6 +65,10 @@ async function analyzeSite(body) {
     ? { ok: false, value: { available: false, reason: 'Not connected: set EARTHDATA_TOKEN (free NASA Earthdata account).' } }
     : hasWater ? await settle('SWOT', 40000, () => swotLakes(aoi, now)) : { ok: false, value: { available: false, reason: 'No lake or reservoir in this area.' } };
   const pl = placeR.value || {};
+  // Open sea: no country, no land-cover tile and no Sentinel-2 land scene.
+  if (!pl.country && !cover.value?.available && !s2Now.value?.available) {
+    throw geo.httpError(400, 'This spot is open sea, with no farmland or land data. Choose an area on land.');
+  }
   const [fsR, hzR] = await Promise.all([
     settle('FEWS NET food security', 35000, () => live.foodSecurity(pl, now)),
     settle('GDACS hazards', 20000, () => live.hazardsNear(c, pl.country, now))

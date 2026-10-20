@@ -27,9 +27,6 @@
   const handoff = $('#lpHandoff');
   const field = $('#lpField');
   const pin = $('#lpPin');
-  const hud = $('#lpHud');
-  const statusEl = $('#lpStatus');
-  const coordsEl = $('#lpCoords');
   const nav = $('#lpNav');
   const rail = $('#lpRail');
   const railFill = $('#lpRailFill');
@@ -189,16 +186,6 @@
     dim.style.opacity = (0.42 * b + 0.22 * c).toFixed(3);
     handoff.style.opacity = smooth(0.95, 1, p).toFixed(3);
 
-    // HUD
-    const status = p < 0.29 ? 'Acquiring' : p < 0.62 ? 'Tracking' : 'Locked';
-    if (statusEl.textContent !== status) statusEl.textContent = status;
-    hud.classList.toggle('locked', p >= 0.62);
-    hud.style.opacity = hudReady ? String(0.92 * (1 - smooth(0.9, 0.97, p))) : '';
-    if (coordsSettled) {
-      const alt = 786 * Math.pow(1 - p, 3) + 0.4;
-      coordsEl.textContent = `LAT -0.3031 · LON 36.0800 · ALT ${alt < 10 ? alt.toFixed(1) : Math.round(alt)} KM`;
-    }
-
     // Nav and rail switch to the light theme once past the hero.
     const pastHero = y > hero.offsetHeight - vh * 0.5;
     nav.classList.toggle('solid', pastHero);
@@ -223,32 +210,12 @@
     }
   }
 
-  // ─── Intro: "acquiring" the field ───────────────────────────
-  let hudReady = false;
-  let coordsSettled = false;
-
-  function scrambleCoords() {
-    if (reduceMotion) { coordsSettled = true; update(); return; }
-    const start = performance.now();
-    const rand = (n, d) => (Math.random() * n).toFixed(d);
-    const tick = now => {
-      if (now - start < 1500) {
-        coordsEl.textContent = `LAT -${rand(9, 4)} · LON ${rand(90, 4)} · ALT ${rand(999, 0)} KM`;
-        requestAnimationFrame(tick);
-      } else {
-        coordsSettled = true;
-        update();
-      }
-    };
-    requestAnimationFrame(tick);
-  }
-
+  // ─── Intro ──────────────────────────────────────────────────
   function intro() {
     stage.classList.add('lp-ready');
     setTimeout(() => {
       $$('.lp-mask, .lp-reveal', layerA).forEach(el => el.classList.add('in'));
     }, reduceMotion ? 0 : 650);
-    setTimeout(() => { hudReady = true; scrambleCoords(); }, reduceMotion ? 0 : 900);
   }
   const heroImg = $('img', img);
   let introStarted = false;

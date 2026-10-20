@@ -26,7 +26,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js" defer></script>
 <link rel="stylesheet" href="style.css?v=22">
-<link rel="stylesheet" href="landing.css?v=3">
+<link rel="stylesheet" href="landing.css?v=4">
 </head>
 <body>
 
@@ -76,22 +76,12 @@
         <div class="lp-scan"></div>
         <div class="lp-grain"></div>
 
-        <div class="lp-reticle" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
-
-        <div class="lp-hud" id="lpHud" aria-hidden="true">
-          <div>Target · Field 07 · Rift Valley</div>
-          <div class="lp-status"><i></i><span id="lpStatus">Acquiring</span></div>
-          <div class="lp-coords" id="lpCoords">LAT —.——— · LON —.———</div>
-        </div>
-
         <!-- Stage A: headline -->
         <div class="lp-layer lp-layer-a" id="lpLayerA">
-          <div class="lp-pill lp-reveal" style="--d:60ms"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="8" cy="8" r="6.2"/><path d="M1.8 8h12.4M8 1.8c2 2.2 2 10.2 0 12.4M8 1.8c-2 2.2-2 10.2 0 12.4"/></svg>Water · Agriculture · Food security · Earth observation</div>
           <h1 class="lp-h1">
             <span class="lp-mask" style="--d:150ms"><span>See water. Grow food.</span></span>
             <span class="lp-mask" style="--d:300ms"><span><em>Save lives.</em></span></span>
           </h1>
-          <p class="lp-lede lp-reveal" style="--d:520ms">WAFEO is a digital twin of water, agriculture and food systems. It turns open satellite data from Copernicus, NASA and partners into crop, water and food-security intelligence, from a single field to a whole continent.</p>
           <div class="lp-cta-row lp-reveal" style="--d:680ms">
             <button class="lp-btn lp-btn-leaf" data-lp-enter>
               <span data-lp-cta-label>Enter the platform</span>
@@ -150,7 +140,7 @@
     </section>
 
     <!-- METHOD -->
-    <section class="lp-section lp-grid-bg" id="lp-method" data-lp-section="method" data-lp-label="Method">
+    <section class="lp-section" id="lp-method" data-lp-section="method" data-lp-label="Method">
       <div class="lp-wrap">
         <div class="lp-eyebrow lp-reveal">How it works</div>
         <h2 class="lp-h2">
@@ -186,7 +176,7 @@
     </section>
 
     <!-- ANALYST -->
-    <section class="lp-section lp-grid-bg" id="lp-analyst" data-lp-section="analyst" data-lp-label="Analyst">
+    <section class="lp-section" id="lp-analyst" data-lp-section="analyst" data-lp-label="Analyst">
       <div class="lp-wrap lp-analyst">
         <div>
           <div class="lp-eyebrow lp-reveal">The analyst</div>
@@ -202,7 +192,7 @@
           </div>
         </div>
         <div class="lp-chat lp-reveal" style="--d:200ms" id="lpChat">
-          <div class="lp-chat-head"><i>✦</i><div><b>WAFEO AI Assistant</b><small>Example conversation · sample field</small></div><span class="lp-live"></span></div>
+          <div class="lp-chat-head"><i><i data-lucide="sparkles"></i></i><div><b>WAFEO AI Assistant</b><small>Example conversation · sample field</small></div><span class="lp-live"></span></div>
           <div class="lp-chat-body" id="lpChatBody"></div>
         </div>
       </div>
@@ -215,7 +205,6 @@
           <div class="lp-eyebrow lp-reveal">About</div>
           <p class="lp-quote lp-reveal" style="--d:120ms">We built WAFEO on a simple belief: every farmer, water manager and ministry deserves to <em>see what the satellites see</em>, in time to act on it.</p>
           <p class="lp-lede lp-reveal" style="--d:220ms">WAFEO joins open data from Copernicus, NASA, FAO, WFP and partners into one digital twin of water, agriculture and food systems, with a focus on Africa and coverage across every continent.</p>
-          <div class="lp-person lp-reveal" style="--d:320ms"><i>N</i><div><b>Norbert Muzila</b><small>Creator of WAFEO · Earth observation &amp; data</small></div></div>
         </div>
         <figure class="lp-photo lp-reveal" style="margin:0">
           <img src="assets/landing/field-hero.webp" alt="Soybean field in early growth" loading="lazy">
@@ -688,6 +677,6 @@
 <script src="report.js?v=1"></script>
 <script src="pages.js?v=7"></script>
 <script src="https://cdn.jsdelivr.net/npm/lenis@1.1.13/dist/lenis.min.js"></script>
-<script src="landing.js?v=3"></script>
+<script src="landing.js?v=4"></script>
 </body>
 </html>

@@ -26,6 +26,7 @@ async function pickScene(win, now) {
     datetime: `${isoDay(daysAgo(90, now))}T00:00:00Z/${isoDay(now)}T23:59:59Z`,
     query: { 'eo:cloud_cover': { lt: 50 } }, limit: 10
   });
+  if (!items.length) return { none: true };
   for (const item of items.slice(0, 5)) {
     const grid = makeGrid(win, epsgOf(item), 10);
     const scl = await readBand(await signedHref(COLLECTION, item.assets.SCL.href), grid, 0);
@@ -208,6 +209,7 @@ async function traceField([lon, lat], now = new Date()) {
 
   const win = normalizeAoi({ point: [lon, lat], radius_m: WINDOW_M });
   const pick = await pickScene(win, now);
+  if (pick && pick.none) return { found: false, reason: 'No recent satellite images cover this spot (open sea or a polar area). Click a field on land.' };
   if (!pick) return { found: false, reason: 'Recent satellite passes over this spot were cloudy, so its edges could not be traced. Use the circle or draw the field instead.' };
 
   const { item, grid, scl } = pick;

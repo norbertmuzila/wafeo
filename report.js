@@ -225,8 +225,8 @@
       w.ensure(h + 12);
       const y0 = w.y;
       doc.setFillColor(240, 242, 240); doc.rect(MARGIN, y0, size, h, 'F');
-      doc.addImage(im.ndviMap, 'PNG', MARGIN, y0, h / ratio, h, undefined, 'NONE');
-      doc.addImage(im.trueColor, 'PNG', MARGIN + size + 6, y0, h / ratio, h, undefined, 'NONE');
+      doc.addImage(im.ndviMap, 'PNG', MARGIN, y0, h / ratio, h, undefined, 'FAST');
+      doc.addImage(im.trueColor, 'PNG', MARGIN + size + 6, y0, h / ratio, h, undefined, 'FAST');
       doc.setDrawColor(180); doc.setLineWidth(0.2); doc.rect(MARGIN, y0, h / ratio, h); doc.rect(MARGIN + size + 6, y0, h / ratio, h);
       // North marker
       doc.setFillColor(255, 255, 255); doc.circle(MARGIN + h / ratio - 6, y0 + 6, 3.4, 'F');
