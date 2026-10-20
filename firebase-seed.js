@@ -8,18 +8,9 @@ const dataDir = path.join(__dirname, 'data');
 
 const arrayCollections = [
   { file: 'users.json', collection: 'users' },
-  { file: 'alerts.json', collection: 'alerts' },
-  { file: 'satellites.json', collection: 'satellites' },
-  { file: 'ndvi.json', collection: 'ndvi' },
-  { file: 'fields.json', collection: 'fields' },
-  { file: 'countries.json', collection: 'countries' },
 ];
 
-const singleDocCollections = [
-  { file: 'stats.json', collection: 'config', docId: 'stats' },
-  { file: 'water.json', collection: 'config', docId: 'water' },
-  { file: 'food-security.json', collection: 'config', docId: 'food-security' },
-];
+const singleDocCollections = [];
 
 async function seed() {
   console.log('\n  Seeding Firestore...\n');

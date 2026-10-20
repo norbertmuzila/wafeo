@@ -737,19 +737,6 @@ window.toggleNasaGibs = function() {
   }
 };
 
-window.alertApiKey = async function(provider) {
-  try {
-    const res = await fetch(API + `/satellite/external/${encodeURIComponent(provider.replace(/\s+/g, '-').toLowerCase())}`, {
-      headers: authToken ? { 'Authorization': 'Bearer ' + authToken } : {}
-    });
-    const data = await res.json();
-    alert(`🔒 ${provider} Action Blocked\n\n${data.message || 'API Key is missing for this satellite provider.'}`);
-  } catch (err) {
-    // Fallback if backend route fails
-    alert(`🔒 ${provider} Access Denied\n\nYou must configure an Enterprise API key for this data stream in the environment variables.`);
-  }
-};
-
 // ─── ADMIN: Load User Profiles ───────────────────────────
 async function loadAdminUsers() {
   const panel = document.getElementById('adminUsersPanel');

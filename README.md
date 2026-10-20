@@ -13,9 +13,10 @@ automatically (role `researcher`). Admins can change roles in **Settings → Reg
 ```
 index.html, style.css, app.js   Frontend (single-page app, no build step)
 landing.css, landing.js         Home page: pinned scroll hero, sections, hand-off to sign-in
-eo.js                           Live satellite site analysis UI (Site Intelligence, page context, reports)
+eo.js                           Site Intelligence analysis UI and report integration
+pages.js                        Live Dashboard and domain pages (plain + expert views, charts, maps)
 assets/                         Logo and static images (assets/landing/ = home page photo)
-data/*.json                     Reference datasets + local user store
+data/users.json                 Local user store (development only; production uses Firestore)
 server.js                       Local entry point: `npm start`
 api/index.js                    Vercel serverless entry (same app)
 server/
@@ -94,7 +95,9 @@ All endpoints except health and auth require `Authorization: Bearer <token>`.
 | POST | `/api/auth/google` | `{ credential }` Google ID token |
 | POST | `/api/auth/register` | `{ name, email, username, password, region }` |
 | GET | `/api/auth/me` | Restore session, returns a fresh token |
-| GET | `/api/dashboard/stats`, `/api/alerts`, `/api/satellites`, `/api/analytics/ndvi-by-region`, `/api/fields`, `/api/water`, `/api/food-security`, `/api/countries` | Datasets |
+| POST | `/api/eo/analyze` | Live satellite, soil, weather, FEWS NET and GDACS analysis of `{ point, radius_m }` or `{ geometry }` |
+| POST | `/api/eo/ndvi-series` | 24 months of Sentinel-2 NDVI for the same area |
+| GET | `/api/live/hazards` | Live GDACS hazard alerts (drought, flood, cyclone, volcano, wildfire) |
 | GET | `/api/news?limit=n` | Live news |
 | POST | `/api/ai/chat` | `{ messages: [{ role, content }] }` |
 | GET/POST | `/api/reports` | Saved reports (per user) |

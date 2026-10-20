@@ -13,7 +13,10 @@
   const state = { mode: 'point', radius: 1000, point: null, drawPts: [], busy: false, last: null };
   const layers = { aoi: null, draft: null, vertices: [] };
 
+  const SCHEMA = 3; // must match server/services/eo/analyze.js
   try { state.last = JSON.parse(localStorage.getItem(STORE_KEY) || 'null'); } catch (e) { state.last = null; }
+  // Saved results from an older engine version are discarded, never shown.
+  if (state.last && state.last.schema !== SCHEMA) { state.last = null; try { localStorage.removeItem(STORE_KEY); } catch (e) {} }
 
   // ─── Labels ───────────────────────────────────────────────
   const DOMAINS = [

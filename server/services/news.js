@@ -148,26 +148,9 @@ async function fetchLiveNews() {
     return unique;
   }
 
-  // ── Guaranteed curated fallback  Ereal articles, news panel never empty ──
-  console.warn('[news] All live sources failed  Eserving curated fallback');
-  return [
-    { title: 'Global Report on Food Crises 2025: 295 Million People in Acute Food Insecurity', url: 'https://www.fao.org/newsroom/detail/global-report-on-food-crises-grfc-2025/en', date: { created: '2025-04-01T00:00:00Z' }, source: [{ name: 'FAO / WFP / FEWS NET' }], country: [{ name: 'Global' }], tag: 'Food Security' },
-    { title: 'WFP: Sudan hunger emergency deepens  E24.6 million face acute food insecurity', url: 'https://www.wfp.org/countries/sudan', date: { created: '2025-03-15T00:00:00Z' }, source: [{ name: 'WFP' }], country: [{ name: 'Sudan' }], tag: 'Food Security' },
-    { title: 'UN World Water Development Report 2025: Glacier and Groundwater Crisis', url: 'https://www.unwater.org/publications/un-world-water-development-report-2025', date: { created: '2025-03-22T00:00:00Z' }, source: [{ name: 'UN Water / UNESCO' }], country: [{ name: 'Global' }], tag: 'Water' },
-    { title: 'East Africa drought: 28 million at risk as La Niña extends dry season into 2025', url: 'https://reliefweb.int/report/kenya/east-africa-drought-2025', date: { created: '2025-02-20T00:00:00Z' }, source: [{ name: 'OCHA' }], country: [{ name: 'Kenya' }, { name: 'Ethiopia' }, { name: 'Somalia' }], tag: 'Water' },
-    { title: 'Gaza: 2.1 million face catastrophic food insecurity  EIPC classification', url: 'https://www.ipcinfo.org/ipc-country-analysis/details-map/en/c/1157770/', date: { created: '2025-03-10T00:00:00Z' }, source: [{ name: 'IPC / FAO / WFP' }], country: [{ name: 'Palestine' }], tag: 'Food Security' },
-    { title: 'FAO: Global cereal production forecast cut by 1.3% amid climate disruptions', url: 'https://www.fao.org/worldfoodsituation/csdb/en/', date: { created: '2025-03-07T00:00:00Z' }, source: [{ name: 'FAO' }], country: [{ name: 'Global' }], tag: 'Agriculture' },
-    { title: 'Copernicus: Record vegetation stress index across Mediterranean croplands in 2025', url: 'https://www.copernicus.eu/en/media/image-day-gallery', date: { created: '2025-02-15T00:00:00Z' }, source: [{ name: 'Copernicus / ESA' }], country: [{ name: 'Mediterranean' }], tag: 'Agriculture' },
-    { title: 'Nile Basin water levels at 40-year low  EEgypt and Ethiopia in water dispute', url: 'https://reliefweb.int/report/egypt/nile-basin-water-crisis-2025', date: { created: '2025-01-28T00:00:00Z' }, source: [{ name: 'ReliefWeb / OCHA' }], country: [{ name: 'Egypt' }, { name: 'Ethiopia' }, { name: 'Sudan' }], tag: 'Water' },
-    { title: 'NASA GRACE-FO: Groundwater depletion accelerating in North Africa and Arabian Peninsula', url: 'https://earthobservatory.nasa.gov/images/152876/groundwater-decline-north-africa', date: { created: '2025-02-10T00:00:00Z' }, source: [{ name: 'NASA / GRACE-FO' }], country: [{ name: 'North Africa' }, { name: 'Saudi Arabia' }], tag: 'Water' },
-    { title: 'CGIAR: Climate-smart rice varieties boost yields by 30% in flood-prone Bangladesh', url: 'https://www.cgiar.org/news-events/news/climate-smart-rice-bangladesh/', date: { created: '2025-02-05T00:00:00Z' }, source: [{ name: 'CGIAR' }], country: [{ name: 'Bangladesh' }], tag: 'Agriculture' },
-    { title: 'Myanmar: 13 million face food insecurity as conflict disrupts agriculture', url: 'https://www.wfp.org/countries/myanmar', date: { created: '2025-03-01T00:00:00Z' }, source: [{ name: 'WFP' }], country: [{ name: 'Myanmar' }], tag: 'Food Security' },
-    { title: 'World Bank: $2.5 billion fund to support climate-resilient agriculture in Africa', url: 'https://blogs.worldbank.org/en/category/agriculture-and-food', date: { created: '2025-01-20T00:00:00Z' }, source: [{ name: 'World Bank' }], country: [{ name: 'Africa' }], tag: 'Agriculture' },
-    { title: 'FAO Desert Locust alert: New breeding grounds detected in East Africa March 2025', url: 'https://www.fao.org/ag/locusts/en/info/info/index.html', date: { created: '2025-03-05T00:00:00Z' }, source: [{ name: 'FAO DLIS' }], country: [{ name: 'Somalia' }, { name: 'Kenya' }, { name: 'Ethiopia' }], tag: 'Agriculture' },
-    { title: 'South Sudan: IPC Phase 5 Catastrophe  E74,000 face famine conditions', url: 'https://www.ipcinfo.org/ipc-country-analysis/details-map/en/c/1157066/', date: { created: '2025-02-28T00:00:00Z' }, source: [{ name: 'IPC / FAO' }], country: [{ name: 'South Sudan' }], tag: 'Food Security' },
-    { title: 'El Niño to La Niña transition reshapes 2025 rainfall patterns across WAFEO regions', url: 'https://reliefweb.int/report/world/el-nino-la-nina-transition-2025', date: { created: '2025-01-15T00:00:00Z' }, source: [{ name: 'NOAA / WMO' }], country: [{ name: 'Global' }], tag: 'Water' },
-    { title: 'IFAD: Smallholder farmers in Sub-Saharan Africa lose $5B annually to soil degradation', url: 'https://www.ifad.org/en/web/latest/news-detail/asset/43030019', date: { created: '2025-02-18T00:00:00Z' }, source: [{ name: 'IFAD' }], country: [{ name: 'Sub-Saharan Africa' }], tag: 'Agriculture' },
-  ];
+  // Every live source failed: say so rather than show old articles.
+  console.warn('[news] All live sources failed');
+  return [];
 }
 
 module.exports = {

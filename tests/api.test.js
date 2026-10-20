@@ -88,14 +88,12 @@ test('google endpoint rejects bad credentials', async () => {
   assert.strictEqual((await call('POST', '/api/auth/google', { body: { credential: 'not.a.jwt' } })).status, 401);
 });
 
-test('every dashboard endpoint needs a token and returns data with one', async () => {
+test('sample-data endpoints are gone; live endpoints need a token', async () => {
   const token = await login('farmer');
-  for (const p of ['/api/dashboard/stats', '/api/alerts', '/api/satellites', '/api/analytics/ndvi-by-region', '/api/fields', '/api/water', '/api/food-security', '/api/countries']) {
-    assert.strictEqual((await call('GET', p)).status, 401, p + ' without token');
-    const r = await call('GET', p, { token });
-    assert.strictEqual(r.status, 200, p);
-    assert.ok(r.json, p + ' returns JSON');
+  for (const p of ['/api/dashboard/stats', '/api/alerts', '/api/satellites', '/api/fields', '/api/water', '/api/food-security']) {
+    assert.strictEqual((await call('GET', p, { token })).status, 404, p + ' should no longer exist');
   }
+  for (const p of ['/api/news', '/api/live/hazards']) assert.strictEqual((await call('GET', p)).status, 401, p + ' without token');
 });
 
 test('AI chat requires sign-in and explains missing key', async () => {
@@ -138,11 +136,11 @@ test('satellite analysis endpoint requires sign-in and validates the area', asyn
 });
 
 test('private files are not served', async () => {
-  for (const p of ['/data/users.json', '/server.js', '/.env', '/package.json', '/server/config.js']) {
+  for (const p of ['/data/users.json', '/server.js', '/.env', '/package.json', '/server/config.js', '/server/services/eo/live.js']) {
     const r = await call('GET', p);
     assert.ok(!/"password":\s*"/.test(r.text) && !r.text.includes('module.exports') && !r.text.includes('"dependencies"'), p + ' leaked');
   }
-  assert.strictEqual((await call('GET', '/data/stats.json')).status, 200);
+  assert.ok(!(await call('GET', '/data/stats.json')).text.includes('cropHealth'), 'no sample data served');
   const privacy = await call('GET', '/privacy');
   assert.ok(privacy.status === 200 && privacy.text.includes('Privacy Policy'), 'privacy page served');
   assert.ok([401, 404].includes((await call('GET', '/api/seed?secret=wafeo-admin-seed-2024')).status), 'seed route removed');

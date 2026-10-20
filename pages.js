@@ -24,7 +24,11 @@
   const VIEW_KEY = 'wafeo.view';
   let expert = false;
   try { expert = localStorage.getItem(VIEW_KEY) === 'expert'; } catch (e) {}
-  function applyView() { document.body.classList.toggle('lv-expert', expert); document.querySelectorAll('.lv-view button').forEach(b => b.classList.toggle('on', (b.dataset.view === 'expert') === expert)); }
+  function applyView() {
+    document.body.classList.toggle('lv-expert', expert);
+    document.querySelectorAll('.lv-view button').forEach(b => b.classList.toggle('on', (b.dataset.view === 'expert') === expert));
+    document.querySelectorAll('.lv-science').forEach(d => { d.open = expert; });
+  }
 
   // ─── What each number means (plain) and how it is made (expert) ──
   const X = {
@@ -69,9 +73,13 @@
     elevationM: { label: 'Elevation', unit: 'm', fmt: v => num(v, 0), plain: 'Height above sea level.', tech: 'Copernicus DEM GLO-30 mean.' }
   };
 
+  // In the dry season tiny rainfall totals make percent-of-normal and SPI misleading.
+  const DRY_SEASON_HIDDEN = ['rain90PctNormal', 'rain30PctNormal', 'spi90'];
+
   function card(key, metrics, opts = {}) {
     const v = metrics ? metrics[key] : undefined;
     if (v === undefined || v === null) return '';
+    if (metrics.season && DRY_SEASON_HIDDEN.includes(key)) return '';
     const x = X[key] || { label: (site() && site().labels[key]) || key, plain: '' };
     const val = x.fmt ? x.fmt(v) : typeof v === 'number' ? num(v) : esc(v);
     const tone = x.tone ? x.tone(v) : 'neutral';
@@ -335,7 +343,7 @@
         : !Number.isFinite(z) ? 'Not enough rainfall history to judge drought here.'
         : z <= -2 ? 'Extreme drought: rainfall is far below normal.' : z <= -1.5 ? 'Severe drought conditions.' : z <= -1 ? 'Moderate drought: rainfall is clearly below normal.' : z <= -0.5 ? 'Slightly drier than normal.' : z >= 1.5 ? 'Much wetter than normal: watch for floods and waterlogging.' : 'Rainfall is close to normal.';
       return `${plainBox('Drought check', verdict, Number.isFinite(z) && !q.season ? (z <= -1 ? 'bad' : z <= -0.5 ? 'watch' : 'good') : 'neutral')}
-        <div class="lv-meters">${meter('Drought index (SPI-90)', z, -3, 3, ['Extreme drought', 'Normal', 'Very wet'])}${meter('Soil water around roots', q.rootZoneAvailableWaterPct, 0, 100, ['Empty', 'Half', 'Full'], '%')}${meter('Crop thirst (ECOSTRESS)', c.evaporativeStressIndex, 0, 1, ['Very thirsty', '', 'No stress'])}</div>
+        <div class="lv-meters">${q.season ? '' : meter('Drought index (SPI-90)', z, -3, 3, ['Extreme drought', 'Normal', 'Very wet'])}${meter('Soil water around roots', q.rootZoneAvailableWaterPct, 0, 100, ['Empty', 'Half', 'Full'], '%')}${meter('Crop thirst (ECOSTRESS)', c.evaporativeStressIndex, 0, 1, ['Very thirsty', '', 'No stress'])}</div>
         ${cards(['rain90PctNormal', 'rain30PctNormal', 'waterBalanceNext16Mm', 'hotDaysNext16', 'ndviAnomaly', 'smapSoilMoisture7d', 'groundwaterTrendCmYr'], { ...q, ...c })}
         <div class="lv-panel"><h3>Next 16 days</h3><div class="lv-chart lv-chart-sm"><canvas id="lvFcChart"></canvas></div></div>
         <div class="lv-panel"><h3>What to do</h3>${actions(a, /drought|water|mulch|variet|plant|heat|irrigat|basin|ridge|advisory|anticipat/i)}</div>
@@ -392,7 +400,7 @@
       <p class="lv-note">${ph < 5 ? 'Strongly acidic: lime is needed before planting.' : ph < 5.5 ? 'Acidic: liming will improve fertiliser uptake.' : ph <= 7.5 ? 'Good range for most crops.' : 'Alkaline: watch for zinc and iron shortage.'}</p>`;
   }
   function meter(label, v, min, max, ticks, unit = '') {
-    if (!Number.isFinite(v)) return `<div class="lv-meter"><div class="lv-meter-label">${esc(label)}</div><div class="lv-note">No data</div></div>`;
+    if (!Number.isFinite(v)) return ''; // only show readings we actually have
     const pos = Math.min(100, Math.max(0, ((v - min) / (max - min)) * 100));
     return `<div class="lv-meter"><div class="lv-meter-label">${esc(label)}</div><div class="lv-meter-bar"><i style="left:${pos}%"></i></div><div class="lv-meter-ticks">${ticks.map(t => `<span>${esc(t)}</span>`).join('')}</div><div class="lv-meter-value">${num(v, 2)}${unit}</div></div>`;
   }
@@ -505,6 +513,8 @@
   }
 
   async function dashboard() {
+    // The map is created while its page may be hidden; resize once visible.
+    if (typeof map !== 'undefined' && map) { setTimeout(() => map.invalidateSize(), 60); setTimeout(() => map.invalidateSize(), 450); }
     renderDashboard();
     try { await loadHazards(); } catch (e) {}
     renderDashboard();
@@ -516,6 +526,21 @@
     const tag = document.getElementById('dataFreshness');
     const a = A();
     if (tag) tag.innerHTML = `<div class="live-dot"></div>${a ? `Live · analysed ${ago(a.generatedAt)}` : 'Live feeds'}`;
+    // Sidebar badges follow the live analysis.
+    const setBadge = (page, text, cls) => {
+      const link = document.querySelector(`.nav-link[data-page="${page}"]`);
+      if (!link) return;
+      let b = link.querySelector('.badge');
+      if (!text) { if (b) b.remove(); return; }
+      if (!b) { b = document.createElement('span'); link.appendChild(b); }
+      b.className = 'badge ' + cls;
+      b.textContent = text;
+    };
+    const dry = a ? a.issues.filter(i => ['water', 'climate'].includes(i.domain) && ['critical', 'high', 'medium'].includes(i.severity)).length : 0;
+    setBadge('drought-monitor', dry ? String(dry) : '', 'crit');
+    const fsd = a && a.domains.foodSecurity;
+    const ph = fsd && /Phase (\d)/.exec(fsd.status || '');
+    setBadge('food-security', ph ? `IPC ${ph[1]}` : '', ph && Number(ph[1]) >= 3 ? 'crit' : 'warn');
     const badge = document.getElementById('notifBadge');
     if (badge) {
       const n = a ? a.issues.filter(i => i.severity === 'critical' || i.severity === 'high').length : 0;
@@ -545,8 +570,17 @@
     drawDashboardMap();
     updateFreshness();
   });
-  document.addEventListener('wafeo:auth', () => setTimeout(() => { updateFreshness(); if (currentPage() === 'dashboard') dashboard(); }, 400));
-  setInterval(() => { updateFreshness(); if (currentPage() === 'dashboard') dashboard(); }, 15 * 60 * 1000);
+  // Keep results current: an analysis older than 6 hours refreshes itself.
+  const STALE_MS = 6 * 60 * 60 * 1000;
+  function refreshIfStale() {
+    const a = A();
+    if (!a || busy || Date.now() - Date.parse(a.generatedAt) < STALE_MS) return;
+    const pg = currentPage();
+    const host = document.querySelector(`#pg-${pg} .lv-host`) || document.querySelector('#pg-dashboard .lv-host');
+    if (host) runFrom(host, { geometry: a.aoi.geometry }, 'Updating to the latest data');
+  }
+  document.addEventListener('wafeo:auth', () => setTimeout(() => { updateFreshness(); if (currentPage() === 'dashboard') dashboard(); refreshIfStale(); }, 400));
+  setInterval(() => { updateFreshness(); if (currentPage() === 'dashboard') dashboard(); refreshIfStale(); }, 15 * 60 * 1000);
 
   window.wafeoLive = { render, dashboard, attachDashboardMap };
 })();

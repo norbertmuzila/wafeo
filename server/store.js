@@ -1,6 +1,6 @@
 // ─── Data store ──────────────────────────────────────────────
-// Firestore when FIREBASE_* variables are set, otherwise the JSON
-// files in data/. All reads and writes go through this module so the
+// Firestore when FIREBASE_* variables are set, otherwise data/users.json
+// (local development). All reads and writes go through this module so the
 // routes never care which backend is active.
 
 const fs = require('fs');
@@ -17,41 +17,6 @@ if (process.env.FIREBASE_PROJECT_ID) {
   }
 } else {
   console.log('[store] FIREBASE_PROJECT_ID not set, using JSON files in data/');
-}
-
-const DATASETS = {
-  'stats':         { file: 'stats.json',         doc: ['config', 'stats'] },
-  'alerts':        { file: 'alerts.json',        collection: 'alerts' },
-  'satellites':    { file: 'satellites.json',    collection: 'satellites' },
-  'ndvi':          { file: 'ndvi.json',          collection: 'ndvi' },
-  'fields':        { file: 'fields.json',        collection: 'fields' },
-  'water':         { file: 'water.json',         doc: ['config', 'water'] },
-  'food-security': { file: 'food-security.json', doc: ['config', 'food-security'] },
-  'countries':     { file: 'countries.json',     collection: 'countries' }
-};
-
-function readJson(file) {
-  return JSON.parse(fs.readFileSync(path.join(config.dataDir, file), 'utf8'));
-}
-
-// Read-only reference datasets (dashboard panels).
-async function getDataset(name) {
-  const ds = DATASETS[name];
-  if (!ds) throw new Error('Unknown dataset: ' + name);
-  if (db) {
-    try {
-      if (ds.collection) {
-        const snap = await db.collection(ds.collection).get();
-        if (!snap.empty) return snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      } else {
-        const doc = await db.collection(ds.doc[0]).doc(ds.doc[1]).get();
-        if (doc.exists) return doc.data();
-      }
-    } catch (err) {
-      console.warn(`[store] Firestore read of ${name} failed, using JSON:`, err.message);
-    }
-  }
-  return readJson(ds.file);
 }
 
 // ─── Users ───────────────────────────────────────────────────
@@ -165,7 +130,6 @@ async function listActivity(limit = 100) {
 
 module.exports = {
   backend: () => (db ? 'firestore' : 'json'),
-  getDataset,
   listUsers, findUserByLogin, findUserByEmail, findUserById, createUser, updateUser,
   addReport, listReports, logActivity, listActivity
 };

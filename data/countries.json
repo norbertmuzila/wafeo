@@ -1,8 +1,0 @@
-[
-  { "id": "us", "name": "United States", "ndvi": 0.68, "water": 72, "food": "Phase 1", "pop": "331M", "location": [37.0902, -95.7129] },
-  { "id": "br", "name": "Brazil", "ndvi": 0.78, "water": 82, "food": "Phase 1", "pop": "214M", "location": [-14.2350, -51.9253] },
-  { "id": "in", "name": "India", "ndvi": 0.56, "water": 42, "food": "Phase 2", "pop": "1.4B", "location": [20.5937, 78.9629] },
-  { "id": "cn", "name": "China", "ndvi": 0.62, "water": 58, "food": "Phase 1", "pop": "1.4B", "location": [35.8617, 104.1954] },
-  { "id": "za", "name": "South Africa", "ndvi": 0.51, "water": 44, "food": "Phase 2", "pop": "60M", "location": [-30.5595, 22.9375] },
-  { "id": "so", "name": "Somalia", "ndvi": 0.18, "water": 12, "food": "Phase 4", "pop": "17M", "location": [5.1521, 46.1996] }
-]

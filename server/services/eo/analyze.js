@@ -61,7 +61,9 @@ async function analyzeSite(body) {
   ]);
   // SWOT downloads an ~8 MB pass file, so only look when the area holds water.
   const hasWater = (gsw.value?.maxExtentHa || 0) >= 1 || (s2Now.value?.water?.areaHa || 0) >= 1;
-  const swotR = hasWater ? await settle('SWOT', 40000, () => swotLakes(aoi, now)) : { ok: false, value: { available: false, reason: 'No lake or reservoir in this area.' } };
+  const swotR = !nasa.configured()
+    ? { ok: false, value: { available: false, reason: 'Not connected: set EARTHDATA_TOKEN (free NASA Earthdata account).' } }
+    : hasWater ? await settle('SWOT', 40000, () => swotLakes(aoi, now)) : { ok: false, value: { available: false, reason: 'No lake or reservoir in this area.' } };
   const pl = placeR.value || {};
   const [fsR, hzR] = await Promise.all([
     settle('FEWS NET food security', 35000, () => live.foodSecurity(pl, now)),
@@ -112,6 +114,7 @@ async function analyzeSite(body) {
 
   const analysis = interpret(data);
   const result = {
+    schema: 3, // bump when the result format changes; browsers drop older saved analyses
     generatedAt: now.toISOString(),
     aoi: { geometry: aoi, areaHa: Math.round(geo.areaHa(aoi) * 10) / 10, centroid: c },
     ...analysis,
