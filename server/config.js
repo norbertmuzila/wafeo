@@ -70,7 +70,8 @@ module.exports = {
   corsOrigins,
   groqApiKey: process.env.GROQ_API_KEY || '',
   // Tried in order; a retired model falls through to the next one.
-  groqModels: [...new Set([process.env.GROQ_MODEL, 'openai/gpt-oss-120b', 'openai/gpt-oss-20b'].filter(Boolean))],
+  // Each model has its own rate limit, so the later ones also add capacity.
+  groqModels: [...new Set([process.env.GROQ_MODEL, 'openai/gpt-oss-120b', 'openai/gpt-oss-20b', 'meta-llama/llama-4-scout-17b-16e-instruct', 'llama-3.1-8b-instant'].filter(Boolean))],
   dataDir: require('path').join(__dirname, '..', 'data'),
   // Lets tests point the JSON store at a temp copy without touching data/.
   usersFile: process.env.WAFEO_USERS_FILE || null

@@ -27,19 +27,27 @@
     lines.push(`Analysed: ${a.generatedAt.slice(0, 16).replace('T', ' ')} UTC. Satellite image: ${(a.data.sentinel2 && a.data.sentinel2.scene && a.data.sentinel2.scene.date) || 'n/a'}.`);
     lines.push(`Overall: ${a.overall.riskLevel} risk${Number.isFinite(a.overall.score) ? `, condition score ${a.overall.score}/100` : ''}. ${a.overall.headline}`);
     const labels = site.labels || {};
+    // In the dry season percent-of-normal rainfall is misleading (tiny normals): leave it out, as the pages do.
+    const dry = !!(a.domains.waterQuantity && a.domains.waterQuantity.metrics && a.domains.waterQuantity.metrics.season);
+    if (dry) lines.push('Season: dry season here, so little rain is normal; percentages of normal rainfall are not meaningful and are omitted.');
+    const skip = new Set(dry ? ['rain30PctNormal', 'rain90PctNormal', 'spi90'] : []);
     for (const [k, d] of Object.entries(a.domains || {})) {
       if (!d) continue;
-      const m = Object.entries(d.metrics || {}).filter(([, v]) => v !== null && v !== undefined && v !== '')
+      const m = Object.entries(d.metrics || {}).filter(([mk, v]) => v !== null && v !== undefined && v !== '' && !skip.has(mk))
         .map(([mk, v]) => `${labels[mk] || mk}: ${typeof v === 'object' ? JSON.stringify(v) : n(v)}`).join('; ');
       lines.push(`[${k}] status ${d.status}${Number.isFinite(d.score) ? ` (${d.score}/100)` : ''}. ${d.summary}${m ? ` Readings: ${m}.` : ''}`);
     }
     if (a.issues && a.issues.length) lines.push('Warnings (most urgent first): ' + a.issues.slice(0, 8).map(i => `${i.severity}: ${i.title} (${i.detail})`).join(' | '));
     for (const who of ['farmers', 'government', 'public']) {
       const r = (a.recommendations && a.recommendations[who]) || [];
-      if (r.length) lines.push(`Actions for ${who}: ` + r.slice(0, 4).map(x => `${x.action} [why: ${x.why}]`).join(' | '));
+      if (r.length) lines.push(`Actions for ${who}: ` + r.slice(0, 4).map(x => x.action).join(' | '));
     }
     const fc = a.data.weather && a.data.weather.forecastDaily;
-    if (fc && fc.length) lines.push('16-day forecast (date: rain mm / max °C / crop water need mm): ' + fc.map(r => `${r.date.slice(5)}: ${n(r.rainMm, 1)}/${n(r.tmaxC, 0)}/${n(r.et0Mm, 1)}`).join(', '));
+    if (fc && fc.length) {
+      const sum = k => n(fc.reduce((t, r) => t + (r[k] || 0), 0), 1);
+      const wet = fc.filter(r => (r.rainMm || 0) >= 1).map(r => `${r.date.slice(5)} ${n(r.rainMm, 1)} mm`);
+      lines.push(`16-day forecast ${fc[0].date} to ${fc[fc.length - 1].date}: rain ${sum('rainMm')} mm in total (days with 1 mm or more: ${wet.join(', ') || 'none'}); crop water need ${sum('et0Mm')} mm; hottest day ${n(Math.max(...fc.map(r => r.tmaxC ?? -99)), 0)} °C.`);
+    }
     const hz = (a.data.hazards && a.data.hazards.events) || [];
     if (hz.length) lines.push('Hazard alerts within 600 km: ' + hz.slice(0, 5).map(e => `${e.type} ${e.alert} ${e.distanceKm} km (${e.country})`).join('; '));
     const f = a.data.foodSecurity;
@@ -147,6 +155,15 @@
       typing.remove();
       history.pop();                      // let the user retry the same question
       save();
+      // A busy service usually frees up within seconds: retry once automatically.
+      if (!send._auto && /busy|try again/i.test(e.message)) {
+        send._auto = true;
+        win.lastElementChild && win.lastElementChild.classList.contains('ai-user') && win.lastElementChild.remove();
+        busy = false;
+        setTimeout(() => { send(text).finally(() => { send._auto = false; }); }, 4000);
+        return;
+      }
+      send._auto = false;
       const div = bubble('assistant', `${esc(e.name === 'TimeoutError' ? 'The answer took too long.' : e.message)} <button type="button" class="ai-retry">Try again</button>`, ' ai-error');
       div.querySelector('.ai-retry').addEventListener('click', () => { div.remove(); win.lastElementChild && win.lastElementChild.classList.contains('ai-user') && win.lastElementChild.remove(); send(text); });
     } finally {
