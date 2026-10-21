@@ -194,11 +194,81 @@
     panel.setAttribute('aria-hidden', String(!on));
     fab.setAttribute('aria-expanded', String(on));
     fab.classList.toggle('active', on);
-    if (on) { renderAll(); setTimeout(() => input.focus(), 50); }
+    if (on) { place(); renderAll(); setTimeout(() => input.focus(), 50); }
   }
   function autosize() { input.style.height = 'auto'; input.style.height = Math.min(120, input.scrollHeight) + 'px'; input.style.overflowY = input.scrollHeight > 120 ? 'auto' : 'hidden'; }
 
-  fab.addEventListener('click', () => open(!panel.classList.contains('open')));
+  // ─── Draggable button ─────────────────────────────────────
+  // Drag it anywhere (mouse or touch); a short tap still opens the chat.
+  // The position is remembered, and the panel opens towards the side of
+  // the screen with more room so it is never pushed off-screen.
+  const box = $('aiWidgetContainer');
+  const POS_KEY = 'wafeo.askAiPos';
+  const defaultPos = () => (innerWidth <= 600 ? { r: 12, b: 96 } : { r: 20, b: 110 });
+  let pos = null;
+  try { const p = JSON.parse(localStorage.getItem(POS_KEY) || 'null'); if (p && Number.isFinite(p.r) && Number.isFinite(p.b)) pos = p; } catch (e) {}
+  // The fixed footer bar at the bottom is off-limits for the button and panel.
+  const footerH = () => { const f = document.getElementById('platformFooter'); if (!f || getComputedStyle(f).display === 'none') return 0; const r = f.getBoundingClientRect(); return r.height ? Math.max(0, innerHeight - r.top) : 0; };
+  function clampPos(p) {
+    const w = fab.offsetWidth || 120, h = fab.offsetHeight || 56, m = 8, fb = footerH();
+    return { r: Math.min(Math.max(m, p.r), Math.max(m, innerWidth - w - m)), b: Math.min(Math.max(fb + m, p.b), Math.max(fb + m, innerHeight - h - m)) };
+  }
+  function place() {
+    const w = fab.offsetWidth || 120, h = fab.offsetHeight || 56;
+    const p = clampPos(pos || defaultPos());
+    const left = innerWidth - p.r - w, top = innerHeight - p.b - h;
+    const down = top < innerHeight - (top + h);          // more room below than above
+    const leftSide = left + w / 2 < innerWidth / 2;
+    box.style.flexDirection = down ? 'column-reverse' : 'column';
+    box.style.alignItems = leftSide ? 'flex-start' : 'flex-end';
+    box.style.top = down ? top + 'px' : 'auto';
+    box.style.bottom = down ? 'auto' : p.b + 'px';
+    box.style.left = leftSide ? left + 'px' : 'auto';
+    box.style.right = leftSide ? 'auto' : p.r + 'px';
+    panel.style.maxHeight = Math.max(240, (down ? innerHeight - footerH() - top - h : top) - 24) + 'px';
+  }
+  let drag = null, justDragged = false;
+  fab.addEventListener('pointerdown', e => {
+    if (e.button !== 0) return;
+    const p = clampPos(pos || defaultPos());
+    drag = { x: e.clientX, y: e.clientY, r: p.r, b: p.b, moved: false, id: e.pointerId };
+    // Follow the pointer even when it moves faster than the button.
+    try { fab.setPointerCapture(e.pointerId); } catch (err) {}
+  });
+  addEventListener('pointermove', e => {
+    if (!drag || e.pointerId !== drag.id) return;
+    const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+    if (!drag.moved && Math.hypot(dx, dy) < 6) return;   // still a tap
+    if (!drag.moved) { drag.moved = true; fab.classList.add('dragging'); }
+    pos = clampPos({ r: drag.r - dx, b: drag.b - dy });
+    place();
+  });
+  const endDrag = e => {
+    if (!drag || (e && e.pointerId !== drag.id)) return;
+    if (drag.moved) {
+      justDragged = true;
+      setTimeout(() => { justDragged = false; }, 0);
+      fab.classList.remove('dragging');
+      try { localStorage.setItem(POS_KEY, JSON.stringify(pos)); } catch (err) {}
+    }
+    drag = null;
+  };
+  addEventListener('pointerup', endDrag);
+  addEventListener('pointercancel', endDrag);
+  // Keyboard: Alt + arrow keys move the button.
+  fab.addEventListener('keydown', e => {
+    if (!e.altKey || !/^Arrow/.test(e.key)) return;
+    e.preventDefault();
+    const p = clampPos(pos || defaultPos()), step = 24;
+    pos = clampPos({ r: p.r + (e.key === 'ArrowLeft' ? step : e.key === 'ArrowRight' ? -step : 0), b: p.b + (e.key === 'ArrowUp' ? step : e.key === 'ArrowDown' ? -step : 0) });
+    place();
+    try { localStorage.setItem(POS_KEY, JSON.stringify(pos)); } catch (err) {}
+  });
+  addEventListener('resize', place);
+  document.addEventListener('wafeo:auth', () => setTimeout(place, 500));
+  place();
+
+  fab.addEventListener('click', () => { if (justDragged) return; open(!panel.classList.contains('open')); });
   $('aiCloseBtn').addEventListener('click', () => open(false));
   $('aiNewChat').addEventListener('click', () => { history = []; save(); renderAll(); input.focus(); });
   form.addEventListener('submit', e => { e.preventDefault(); send(input.value); });

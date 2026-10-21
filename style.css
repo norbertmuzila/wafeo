@@ -1788,7 +1788,7 @@ body.atlas-lock { overflow: hidden; }
 @media (max-width: 760px) { .cv-grid { grid-template-columns: 1fr; } .cv-ticks span:nth-child(even) { visibility: hidden; } }
 
 /* ═══ Ask AI: floating button and chat panel (bottom right) ═══ */
-#aiWidgetContainer { position: fixed; right: 20px; bottom: calc(46px + env(safe-area-inset-bottom, 0px)); z-index: 9990; display: flex; flex-direction: column; align-items: flex-end; gap: 12px; pointer-events: none; }
+#aiWidgetContainer { position: fixed; right: 20px; bottom: calc(110px + env(safe-area-inset-bottom, 0px)); z-index: 9990; display: flex; flex-direction: column; align-items: flex-end; gap: 12px; pointer-events: none; }
 #aiWidgetContainer > * { pointer-events: auto; }
 .ai-float { display: inline-flex; align-items: center; gap: 10px; padding: 5px 18px 5px 5px; border: 1px solid rgba(15, 23, 42, 0.08); border-radius: 999px; background: #fff; color: #0b3d91; font: inherit; font-size: 15px; font-weight: 700; letter-spacing: 0.01em; cursor: pointer;
   box-shadow: 0 10px 28px rgba(11, 61, 145, 0.25), 0 2px 6px rgba(0, 0, 0, 0.08); transition: transform 0.2s, box-shadow 0.2s; animation: aiFloat 3.2s ease-in-out infinite; }
@@ -1796,6 +1796,9 @@ body.atlas-lock { overflow: hidden; }
 .ai-float:hover { transform: translateY(-3px); box-shadow: 0 14px 34px rgba(11, 61, 145, 0.32), 0 2px 6px rgba(0, 0, 0, 0.1); animation-play-state: paused; }
 .ai-float:focus-visible { outline: 3px solid rgba(0, 112, 192, 0.45); outline-offset: 3px; }
 .ai-float.active { animation: none; background: #0b3d91; color: #fff; }
+.ai-float { touch-action: none; cursor: grab; user-select: none; -webkit-user-select: none; }
+.ai-float img { -webkit-user-drag: none; pointer-events: none; }
+.ai-float.dragging { cursor: grabbing; animation: none; transform: scale(1.04); box-shadow: 0 18px 40px rgba(11, 61, 145, 0.35); transition: none; }
 @keyframes aiFloat { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
 @media (prefers-reduced-motion: reduce) { .ai-float { animation: none; } }
 
@@ -1840,7 +1843,7 @@ body.atlas-lock { overflow: hidden; }
 .ai-compose button:disabled { opacity: 0.5; cursor: progress; }
 .ai-foot { margin: 0; padding: 0 14px 10px; font-size: 10.5px; color: var(--text-muted); background: var(--bg-primary, #fff); }
 @media (max-width: 600px) {
-  #aiWidgetContainer { right: 12px; bottom: calc(44px + env(safe-area-inset-bottom, 0px)); }
+  #aiWidgetContainer { right: 12px; bottom: calc(96px + env(safe-area-inset-bottom, 0px)); }
   #aiWidgetPanel { height: calc(100vh - 140px); }
   .ai-float { font-size: 14px; padding-right: 14px; }
   .ai-float img { width: 40px; height: 40px; }
