@@ -23,12 +23,12 @@
     if (!a) return '';
     const p = a.data.place || {};
     const lines = [];
+    const dry = !!(a.domains.waterQuantity && a.domains.waterQuantity.metrics && a.domains.waterQuantity.metrics.season);
     lines.push(`Area: ${[p.name, p.admin1, p.country].filter(Boolean).join(', ') || 'selected area'}; ${a.aoi.areaHa} ha; centre ${a.aoi.centroid[1].toFixed(4)}, ${a.aoi.centroid[0].toFixed(4)}.`);
     lines.push(`Analysed: ${a.generatedAt.slice(0, 16).replace('T', ' ')} UTC. Satellite image: ${(a.data.sentinel2 && a.data.sentinel2.scene && a.data.sentinel2.scene.date) || 'n/a'}.`);
     lines.push(`Overall: ${a.overall.riskLevel} risk${Number.isFinite(a.overall.score) ? `, condition score ${a.overall.score}/100` : ''}. ${a.overall.headline}`);
     const labels = site.labels || {};
     // In the dry season percent-of-normal rainfall is misleading (tiny normals): leave it out, as the pages do.
-    const dry = !!(a.domains.waterQuantity && a.domains.waterQuantity.metrics && a.domains.waterQuantity.metrics.season);
     if (dry) lines.push('Season: dry season here, so little rain is normal; percentages of normal rainfall are not meaningful and are omitted.');
     const skip = new Set(dry ? ['rain30PctNormal', 'rain90PctNormal', 'spi90'] : []);
     for (const [k, d] of Object.entries(a.domains || {})) {
@@ -37,6 +37,21 @@
         .map(([mk, v]) => `${labels[mk] || mk}: ${typeof v === 'object' ? JSON.stringify(v) : n(v)}`).join('; ');
       lines.push(`[${k}] status ${d.status}${Number.isFinite(d.score) ? ` (${d.score}/100)` : ''}. ${d.summary}${m ? ` Readings: ${m}.` : ''}`);
     }
+    // The platform's own reading of key numbers, so answers do not misread them.
+    const W = (a.domains.waterQuantity && a.domains.waterQuantity.metrics) || {};
+    const notes = [];
+    const z = W.spi90;
+    notes.push('Drought check: ' + (dry ? 'it is the dry season here, so little rain is normal; this is not a drought signal. Watch the start of the rains and soil water.'
+      : !Number.isFinite(z) ? 'not enough rainfall history to judge drought.'
+      : z <= -2 ? 'extreme drought (rainfall far below normal).' : z <= -1.5 ? 'severe drought.' : z <= -1 ? 'moderate drought: rainfall clearly below normal.' : z <= -0.5 ? 'slightly drier than normal, not a drought.' : z >= 1.5 ? 'much wetter than normal.' : 'rainfall is within the normal range; no drought.'));
+    if (Number.isFinite(W.rootZoneAvailableWaterPct)) {
+      const pct = W.rootZoneAvailableWaterPct, sp = W.rootZoneSeasonalPercentile;
+      notes.push(`Soil water now: root-zone wetness is ${pct}% of this spot's own 10-year range (0% = driest, 100% = wettest), i.e. ${pct < 25 ? 'dry' : pct < 45 ? 'somewhat dry' : pct <= 70 ? 'about average' : 'wet'}${Number.isFinite(sp) ? `; compared with the same weeks in past years it is at the ${sp}th percentile (${sp >= 80 ? 'unusually wet for the season' : sp <= 20 ? 'unusually dry for the season' : 'normal for the season'})` : ''}.`);
+    }
+    if ((a.issues || []).some(i => /holds little water/i.test(i.title))) notes.push('"Soil holds little water" refers to the low water-holding CAPACITY of this soil type (how much it can store), not to how wet it is now.');
+    const fsd = a.data.foodSecurity;
+    if (fsd && fsd.available && fsd.current) notes.push(`Food security: IPC Phase ${fsd.current.phase} (${fsd.current.label}) now.`);
+    lines.push('INTERPRETATION: ' + notes.join(' '));
     if (a.issues && a.issues.length) lines.push('Warnings (most urgent first): ' + a.issues.slice(0, 8).map(i => `${i.severity}: ${i.title} (${i.detail})`).join(' | '));
     for (const who of ['farmers', 'government', 'public']) {
       const r = (a.recommendations && a.recommendations[who]) || [];
