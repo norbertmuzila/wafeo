@@ -217,15 +217,24 @@
     const w = fab.offsetWidth || 120, h = fab.offsetHeight || 56;
     const p = clampPos(pos || defaultPos());
     const left = innerWidth - p.r - w, top = innerHeight - p.b - h;
-    const down = top < innerHeight - (top + h);          // more room below than above
+    box.style.right = p.r + 'px';
+    box.style.bottom = p.b + 'px';
+    // The panel is placed on its own, in the larger free space above or below
+    // the button (so it does not cover it), or full height on small screens.
+    const m = 12, floor = innerHeight - footerH() - m;
+    const pw = Math.min(400, innerWidth - 2 * m);
+    const above = top - 2 * m, below = floor - (top + h + m);
+    let ph, pt;
+    if (Math.max(above, below) >= 320) {                 // fits beside the button without covering it
+      if (above >= below) { ph = Math.min(620, above); pt = top - m - ph; }
+      else { ph = Math.min(620, below); pt = top + h + m; }
+    } else {                                             // small screen: use the full height
+      ph = Math.min(620, floor - m); pt = Math.max(m, floor - ph);
+    }
     const leftSide = left + w / 2 < innerWidth / 2;
-    box.style.flexDirection = down ? 'column-reverse' : 'column';
-    box.style.alignItems = leftSide ? 'flex-start' : 'flex-end';
-    box.style.top = down ? top + 'px' : 'auto';
-    box.style.bottom = down ? 'auto' : p.b + 'px';
-    box.style.left = leftSide ? left + 'px' : 'auto';
-    box.style.right = leftSide ? 'auto' : p.r + 'px';
-    panel.style.maxHeight = Math.max(240, (down ? innerHeight - footerH() - top - h : top) - 24) + 'px';
+    let pl = leftSide ? left : left + w - pw;
+    pl = Math.min(Math.max(m, pl), innerWidth - pw - m);
+    Object.assign(panel.style, { top: pt + 'px', left: pl + 'px', width: pw + 'px', height: ph + 'px', maxHeight: '' });
   }
   let drag = null, justDragged = false;
   fab.addEventListener('pointerdown', e => {

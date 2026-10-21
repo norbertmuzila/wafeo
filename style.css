@@ -1802,7 +1802,7 @@ body.atlas-lock { overflow: hidden; }
 @keyframes aiFloat { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
 @media (prefers-reduced-motion: reduce) { .ai-float { animation: none; } }
 
-#aiWidgetPanel { display: none; width: min(400px, calc(100vw - 32px)); height: min(620px, calc(100vh - 150px)); margin: 0; background: var(--bg-primary, #fff); border-radius: 18px; border: 1px solid var(--border);
+#aiWidgetPanel { display: none; position: fixed; width: min(400px, calc(100vw - 32px)); height: min(620px, calc(100vh - 150px)); margin: 0; background: var(--bg-primary, #fff); border-radius: 18px; border: 1px solid var(--border);
   box-shadow: 0 22px 60px rgba(15, 23, 42, 0.28); flex-direction: column; overflow: hidden; transform-origin: bottom right; animation: popIn 0.22s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
 #aiWidgetPanel.open { display: flex; }
 .ai-head { display: flex; align-items: center; gap: 10px; padding: 12px 12px 12px 14px; background: linear-gradient(135deg, #0b3d91, #0070c0); color: #fff; }
@@ -1844,7 +1844,6 @@ body.atlas-lock { overflow: hidden; }
 .ai-foot { margin: 0; padding: 0 14px 10px; font-size: 10.5px; color: var(--text-muted); background: var(--bg-primary, #fff); }
 @media (max-width: 600px) {
   #aiWidgetContainer { right: 12px; bottom: calc(96px + env(safe-area-inset-bottom, 0px)); }
-  #aiWidgetPanel { height: calc(100vh - 140px); }
   .ai-float { font-size: 14px; padding-right: 14px; }
   .ai-float img { width: 40px; height: 40px; }
 }
