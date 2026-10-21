@@ -160,17 +160,56 @@ async function fromFeeds() {
   return out;
 }
 
+// Google throttles heavy use (it redirects to a "sorry" page), so every
+// query is cached (15 min live, 24 h for a past date) and, once refused,
+// Google is left alone for 15 minutes.
+const gnCache = new Map();
+let gnBlockedUntil = 0;
+const googleBusy = () => Date.now() < gnBlockedUntil;
 async function fromGoogleNews(date) {
   const out = [];
   const when = date ? ` after:${addDays(date, -1)} before:${addDays(date, 1)}` : ' when:2d';
+  const ttl = date ? 24 * 3600 * 1000 : 15 * 60 * 1000;
   await Promise.allSettled(GN_QUERIES.map(async ([, q]) => {
-    const url = `https://news.google.com/rss/search?q=${encodeURIComponent(q + when)}&hl=en&gl=US&ceid=US:en`;
-    for (const it of parseFeed(await getText(url, 12000))) {
-      const host = it.sourceUrl ? new URL(it.sourceUrl).host : '';
+    const key = q + when;
+    const hit = gnCache.get(key);
+    let items = hit && Date.now() - hit.at < ttl ? hit.items : null;
+    if (!items) {
+      if (googleBusy()) { if (hit) items = hit.items; else return; }
+      else {
+        const url = `https://news.google.com/rss/search?q=${encodeURIComponent(key)}&hl=en&gl=US&ceid=US:en`;
+        const res = await fetch(url, { headers: UA, signal: AbortSignal.timeout(12000), redirect: 'manual' });
+        if (res.status !== 200) { gnBlockedUntil = Date.now() + 15 * 60 * 1000; if (hit) items = hit.items; else return; }
+        else {
+          items = parseFeed(await res.text());
+          gnCache.set(key, { at: Date.now(), items });
+          if (gnCache.size > 300) gnCache.delete(gnCache.keys().next().value);
+        }
+      }
+    }
+    for (const it of items) {
+      let host = '';
+      try { host = it.sourceUrl ? new URL(it.sourceUrl).host : ''; } catch {}
       // Google appends " - Outlet" to every headline.
       const title = it.sourceName && it.title.endsWith(' - ' + it.sourceName) ? it.title.slice(0, -(it.sourceName.length + 3)) : it.title;
       out.push({ ...it, title, summary: '', origin: 'google', trusted: trustedOf(host) });
     }
+  }));
+  return out;
+}
+
+// Archive by date straight from the outlets' own publishing systems
+// (WordPress): any past day, independent of search engines.
+const WP_SITES = ['newsday.co.zw', 'theindependent.co.zw', 'newzimbabwe.com', 'thestandard.co.zw', 'nyasatimes.com', 'farmersweekly.co.za', 'mongabay.com', 'agfundernews.com', 'circleofblue.org'];
+const wpHost = d => (d === 'mongabay.com' ? 'news.mongabay.com' : d === 'agfundernews.com' ? 'agfundernews.com' : 'www.' + d);
+async function fromWordPress(date) {
+  const out = [];
+  const from = addDays(date, -1), to = addDays(date, 2); // ±1 day covers every time zone
+  await Promise.allSettled(WP_SITES.map(async domain => {
+    const url = `https://${wpHost(domain)}/wp-json/wp/v2/posts?after=${from}T00:00:00&before=${to}T00:00:00&per_page=100&_fields=date_gmt,link,title,excerpt`;
+    const posts = JSON.parse(await getText(url, 12000));
+    if (!Array.isArray(posts)) return;
+    for (const p of posts) out.push({ title: decode(p.title && p.title.rendered), url: p.link, date: p.date_gmt ? p.date_gmt + 'Z' : '', summary: decode(p.excerpt && p.excerpt.rendered).slice(0, 400), origin: 'archive', trusted: trustedOf(domain) });
   }));
   return out;
 }
@@ -239,17 +278,20 @@ const cache = new Map(); // key: 'live' or a date → { at, value, pending }
 
 async function collect(date, tzMin) {
   const now = Date.now();
-  const [feeds, google, gdelt] = await Promise.all([
+  const [feeds, google, gdelt, archive] = await Promise.all([
     date ? Promise.resolve([]) : fromFeeds().catch(() => []),
     fromGoogleNews(date).catch(() => []),
-    fromGdelt(date).catch(err => { console.warn('[news] GDELT:', err.message); return []; })
+    fromGdelt(date).catch(err => { console.warn('[news] GDELT:', err.message); return []; }),
+    date ? fromWordPress(date).catch(() => []) : Promise.resolve([])
   ]);
   // Direct feeds also carry older items; for a past date use what matches.
   const pastFeeds = date && date >= day(new Date(now - 7 * 86400000)) ? await fromFeeds().catch(() => []) : [];
-  const { articles, rejected } = verify([...feeds, ...pastFeeds, ...google, ...gdelt], { date, now, tzMin });
-  const sources = { feeds: feeds.length + pastFeeds.length, google: google.length, gdelt: gdelt.length };
+  const { articles, rejected } = verify([...feeds, ...pastFeeds, ...archive, ...google, ...gdelt], { date, now, tzMin });
+  const sources = { feeds: feeds.length + pastFeeds.length + archive.length, google: google.length, gdelt: gdelt.length };
   console.log(`[news] ${date || 'live'}: ${articles.length} verified stories from ${sources.feeds + sources.google + sources.gdelt} items; rejected ${JSON.stringify(rejected)}`);
-  return { articles, checkedAt: new Date(now).toISOString(), date: date || null, scanned: sources, rejected };
+  // Tell the reader when a search service was busy, so a short list is not mistaken for no news.
+  const partial = !sources.google && (googleBusy() || !!date);
+  return { articles, checkedAt: new Date(now).toISOString(), date: date || null, scanned: sources, rejected, partial };
 }
 
 async function getNews({ date, tzMin = 0 } = {}) {
@@ -264,8 +306,9 @@ async function getNews({ date, tzMin = 0 } = {}) {
   const hit = cache.get(key);
   const refresh = () => {
     const p = collect(date, tzMin).then(value => {
-      // Never replace good results with an empty set from a failed sweep.
-      if (value.articles.length || !hit || !hit.value) cache.set(key, { at: Date.now(), value });
+      // Never replace good results with an empty set from a failed sweep, and
+      // keep incomplete results only briefly so the next visit searches again.
+      if (value.articles.length || !hit || !hit.value) cache.set(key, { at: value.partial ? Date.now() - ttl + 2 * 60 * 1000 : Date.now(), value });
       return value;
     }).finally(() => { const c = cache.get(key); if (c) c.pending = null; });
     cache.set(key, { ...(cache.get(key) || {}), pending: p });

@@ -118,7 +118,7 @@
       (state.topic === 'all' || a.topic === state.topic) &&
       (!state.q || `${a.title} ${a.summary || ''} ${a.outlets.join(' ')} ${a.region}`.toLowerCase().includes(state.q)));
     const scanned = d.scanned ? d.scanned.feeds + d.scanned.google + d.scanned.gdelt : 0;
-    if (note) note.innerHTML = `<i data-lucide="shield-check"></i>${items.length} of ${d.articles.length} verified stories · ${scanned.toLocaleString()} items scanned from trusted outlets worldwide${state.error ? ` · <span class="ln-warn">${esc(state.error)}</span>` : ''}`;
+    if (note) note.innerHTML = `<i data-lucide="shield-check"></i>${items.length} of ${d.articles.length} verified stories · ${scanned.toLocaleString()} items scanned from trusted outlets worldwide${state.error ? ` · <span class="ln-warn">${esc(state.error)}</span>` : ''}${d.partial ? ' · <span class="ln-warn">Some search services are busy, so this list may be incomplete; it fills in automatically on the next search.</span>' : ''}`;
     if (!items.length) {
       list.innerHTML = `<div class="ln-empty">${d.articles.length ? 'No stories match these filters.' : state.date ? 'No verified stories on these topics were found for this date.' : 'No verified stories yet. The next search runs automatically.'}</div>`;
       return;
