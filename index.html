@@ -25,7 +25,7 @@
 <script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js" defer></script>
-<link rel="stylesheet" href="style.css?v=25">
+<link rel="stylesheet" href="style.css?v=26">
 <link rel="stylesheet" href="landing.css?v=5">
 </head>
 <body>
@@ -423,25 +423,6 @@
         <div class="nav-link" data-page="reports"><span class="ni"><i data-lucide="file-text"></i></span>Reports</div>
         <div class="nav-link" data-page="users" id="navUsers" hidden><span class="ni"><i data-lucide="users"></i></span>Users</div>
         
-        <!-- The SVG Action Button (Floating Panel Trigger) -->
-        <div id="aiFabBtn" class="ai-fab" style="margin: 12px 16px;">
-          <div class="fab-icon-box" style="margin-right: 8px;">
-            <svg viewBox="0 0 100 100" width="30" height="30">
-              <circle cx="50" cy="50" r="45" fill="#1b6033"/>
-              <circle cx="50" cy="50" r="33" fill="none" stroke="#2a8247" stroke-width="2"/>
-              <path d="M50 32 Q68 50 50 68 Q32 50 50 32" fill="#5ee289"/>
-              <circle cx="50" cy="50" r="7" fill="#1b6033"/>
-              <circle cx="50" cy="50" r="3" fill="#5ee289"/>
-              <circle cx="37" cy="68" r="5" fill="#5ee289"/>
-            </svg>
-          </div>
-          <div class="fab-text">
-            <div class="fab-ask">ASK</div>
-            <div class="fab-wafeo">
-              <span style="color:#0a6952; font-size:14px; font-weight:900;">W</span><span style="color:#538116; font-size:14px; font-weight:900;">A</span><span style="color:#b97416; font-size:14px; font-weight:900;">F</span><span style="color:#8cb6df; font-size:14px; font-weight:900;">E</span><span style="color:#9bbbd5; font-size:14px; font-weight:900;">O</span> <span class="fw-ai" style="font-size:9px; padding:1px 4px;">AI</span>
-            </div>
-          </div>
-        </div>
       </div>
     </nav>
     <div class="sb-user">
@@ -632,32 +613,28 @@
       </div>
     </div>
 
-    <!-- ═══ FLOATING AI WIDGET ═══ -->
+    <!-- ═══ FLOATING AI ASSISTANT (bottom right) ═══ -->
     <div id="aiWidgetContainer">
-      <!-- The Floating Panel -->
-      <div id="aiWidgetPanel">
-        <div class="panel-hdr" style="background:#fff; border-bottom:1px solid var(--border); padding: 12px 16px;">
-          <h3 style="display:flex; align-items:center; gap:8px; margin:0; font-size:14px;"><i data-lucide="sparkles"></i>WAFEO Intelligence</h3>
-          <span class="panel-badge" style="background:var(--accent-emerald); font-size:10px;">WAFEO AI</span>
-          <button id="aiCloseBtn" style="background:transparent; border:none; font-size:18px; cursor:pointer; margin-left:auto; color:#888;">&times;</button>
-        </div>
-        <div id="aiChatWindow" style="flex:1; overflow-y:auto; padding: 16px; background: var(--bg-deep); display:flex; flex-direction:column; gap: 12px;">
-          <div class="chat-msg bot">
-            <div class="cm-avatar"><i data-lucide="bot"></i></div>
-            <div class="cm-bubble">Hello! I am your WAFEO AI Assistant. I can help you analyze Earth Observation data, understand NDVI metrics, track water resources, and explain food security warnings on the platform. How can I assist you today?</div>
-          </div>
-        </div>
-        <div style="padding: 12px 12px 8px 12px; border-top: 1px solid var(--border); background: #fff; display:flex; flex-direction:column; gap: 8px;">
-          <div style="display:flex; gap: 8px; align-items:center; width: 100%;">
-            <input type="text" id="aiInput" placeholder="Ask securely..." style="flex:1; padding: 10px 14px; border-radius: 20px; border: 1px solid #dcdcdc; outline:none; font-family:inherit; font-size: 13px; background: #f9f9f9;">
-            <button id="aiSendBtn" style="padding: 10px 16px; border-radius: 20px; border:none; background: var(--accent-blue); color:#fff; font-weight:bold; cursor:pointer; transition: background 0.2s; display:flex; align-items:center; gap:6px;">Send <i data-lucide="send"></i></button>
-          </div>
-          <div style="font-size: 10px; color: #888; font-style: italic; text-align: center; margin-top:-2px;">
-            This AI assistant can make mistakes, please always verify critical data and metrics.
-          </div>
-        </div>
-  </div>
-</div>
+      <section id="aiWidgetPanel" role="dialog" aria-label="Ask AI" aria-hidden="true">
+        <header class="ai-head">
+          <img src="assets/ai-icon.webp?v=1" srcset="assets/ai-icon.webp?v=1 1x, assets/ai-icon-512.webp?v=1 2x" alt="" width="34" height="34">
+          <div class="ai-head-text"><b>Ask AI</b><small id="aiContextNote">WAFEO assistant for water, farming and food security</small></div>
+          <button type="button" id="aiNewChat" class="ai-icon-btn" title="Start a new conversation"><i data-lucide="rotate-ccw"></i></button>
+          <button type="button" id="aiCloseBtn" class="ai-icon-btn" title="Close"><i data-lucide="x"></i></button>
+        </header>
+        <div id="aiChatWindow" aria-live="polite"></div>
+        <div class="ai-suggest" id="aiSuggest"></div>
+        <form class="ai-compose" id="aiForm" autocomplete="off">
+          <textarea id="aiInput" rows="1" placeholder="Ask about your field, crops or water…" aria-label="Your question" maxlength="2000"></textarea>
+          <button type="submit" id="aiSendBtn" title="Send"><i data-lucide="send"></i></button>
+        </form>
+        <p class="ai-foot">Answers use the live results for your analysed area. Check important decisions with local experts.</p>
+      </section>
+      <button type="button" id="aiFabBtn" class="ai-float" aria-controls="aiWidgetPanel" aria-expanded="false">
+        <img src="assets/ai-icon.webp?v=1" srcset="assets/ai-icon.webp?v=1 1x, assets/ai-icon-512.webp?v=1 2x" alt="" width="46" height="46">
+        <span>Ask AI</span>
+      </button>
+    </div>
 
 <div class="ttp" id="ttp"></div>
 
@@ -671,12 +648,13 @@
 <!-- ═══════════════ WATER ANALYTICS MODAL ═══════════════ -->
 
 
-<script src="app.js?v=26"></script>
+<script src="app.js?v=27"></script>
 <script src="eo.js?v=8"></script>
 <script src="atlas.js?v=2"></script>
 <script src="compare.js?v=1"></script>
 <script src="report.js?v=3"></script>
 <script src="livenews.js?v=2"></script>
+<script src="assistant.js?v=1"></script>
 <script src="pages.js?v=7"></script>
 <script src="https://cdn.jsdelivr.net/npm/lenis@1.1.13/dist/lenis.min.js"></script>
 <script src="landing.js?v=4"></script>

@@ -65,7 +65,7 @@ app.use('/api', (err, req, res, next) => {
 // Only the public files are served. The rest of the project
 // (server code, .env, users.json) must never be downloadable.
 const sendFile = file => (req, res) => res.sendFile(path.join(ROOT, file));
-const PUBLIC_FILES = ['/app.js', '/style.css', '/landing.js', '/landing.css', '/privacy.html', '/eo.js', '/pages.js', '/atlas.js', '/report.js', '/livenews.js', '/compare.js'];
+const PUBLIC_FILES = ['/app.js', '/style.css', '/landing.js', '/landing.css', '/privacy.html', '/eo.js', '/pages.js', '/atlas.js', '/report.js', '/livenews.js', '/compare.js', '/assistant.js'];
 app.get(PUBLIC_FILES, (req, res) => res.sendFile(path.join(ROOT, req.path)));
 app.get('/privacy', sendFile('privacy.html'));
 app.use('/assets', express.static(path.join(ROOT, 'assets')));

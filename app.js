@@ -118,7 +118,7 @@ function enterApp(session, { remember = true, action = null } = {}) {
 function doLogout() {
   logActivity('logout', 'User logged out');
   clearSession();
-  try { localStorage.removeItem('wafeo.lastAnalysis'); } catch (e) {}
+  try { localStorage.removeItem('wafeo.lastAnalysis'); sessionStorage.removeItem('wafeo.chat'); } catch (e) {}
   try { if (window.google && google.accounts && google.accounts.id) google.accounts.id.disableAutoSelect(); } catch (e) {}
   // A reload gives the next user a clean slate (map, charts, caches).
   setTimeout(() => window.location.reload(), 150);
@@ -141,7 +141,7 @@ async function wafeoStartDemo() {
 }
 function wafeoLeaveDemo() {
   clearSession();
-  try { localStorage.removeItem('wafeo.lastAnalysis'); } catch (e) {}
+  try { localStorage.removeItem('wafeo.lastAnalysis'); sessionStorage.removeItem('wafeo.chat'); } catch (e) {}
   try { sessionStorage.setItem('wafeo.openRegister', '1'); } catch (e) {}
   window.location.reload();
 }
@@ -227,30 +227,7 @@ function initGoogleSignIn() {
   setTimeout(() => waitForGoogle(attempt + 1), 100);
 })();
 
-const aiFabBtn = document.getElementById('aiFabBtn');
-const aiWidgetPanel = document.getElementById('aiWidgetPanel');
-const aiCloseBtn = document.getElementById('aiCloseBtn');
-const aiInput = document.getElementById('aiInput');
-const aiSendBtn = document.getElementById('aiSendBtn');
-const chatWindow = document.getElementById('aiChatWindow');
-
-if (aiFabBtn && aiWidgetPanel && aiCloseBtn) {
-  aiFabBtn.addEventListener('click', () => {
-    aiWidgetPanel.style.display = aiWidgetPanel.style.display === 'flex' ? 'none' : 'flex';
-    if (aiWidgetPanel.style.display === 'flex') aiInput.focus();
-  });
-  aiCloseBtn.addEventListener('click', () => {
-    aiWidgetPanel.style.display = 'none';
-  });
-  if (aiSendBtn) {
-    aiSendBtn.addEventListener('click', handleUserMsg);
-  }
-  if (aiInput) {
-    aiInput.addEventListener('keypress', (e) => {
-      if (e.key === 'Enter') handleUserMsg();
-    });
-  }
-}
+// The AI assistant (floating "Ask AI" button) lives in assistant.js.
 
 async function doLogin() {
   const username = document.getElementById('inUser').value.trim();
@@ -389,72 +366,6 @@ function timeAgo(ts) {
 function showTip(e, text) { const t=document.getElementById('ttp'); t.textContent=text; t.style.left=(e.clientX+14)+'px'; t.style.top=(e.clientY-12)+'px'; t.classList.add('on'); }
 function hideTip() { document.getElementById('ttp').classList.remove('on'); }
 
-// ─── AI ASSISTANT LOGIC ───
-// The API key is NOT stored in the browser. Requests go to the secure
-// backend proxy (POST /api/ai/chat), which holds GROQ_API_KEY server-side.
-let chatHistory = [
-  { role: "system", content: "You are the WAFEO Digital Twin AI Assistant. You help users understand Earth Observation data, NDVI scores, agriculture, water resources, and food security warnings in Africa. Be concise, professional, and intelligent. Format clearly." }
-];
-
-
-
-
-
-
-
-
-
-async function handleUserMsg() {
-  const text = aiInput.value.trim();
-  if(!text) return;
-  
-  aiInput.value = '';
-  appendChatMsg('user', '<i data-lucide="user-round"></i>', text);
-  chatHistory.push({ role: "user", content: text });
-  
-  const typingId = 'typing-' + Date.now();
-  appendChatMsg('bot', '<i data-lucide="bot"></i>', '<em>Thinking...</em>', typingId);
-
-  try {
-    const response = await fetch(API + '/ai/chat', {
-      method: 'POST',
-      headers: authHeaders({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify({ messages: chatHistory.slice(-20) })
-    });
-
-    const data = await response.json().catch(() => ({}));
-    const botResponse = data.reply || (response.ok ? 'No response generated.' : (data.error || 'The AI service is unavailable right now.'));
-
-    const typingEl = document.getElementById(typingId);
-    if (typingEl) typingEl.remove();
-
-    // Parse basic markdown bolding & newlines
-    let htmlResponse = botResponse.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>');
-    appendChatMsg('bot', '<i data-lucide="bot"></i>', htmlResponse, null, true);
-    if (response.ok) chatHistory.push({ role: "assistant", content: botResponse });
-
-  } catch (err) {
-    const typingEl = document.getElementById(typingId);
-    if (typingEl) typingEl.remove();
-    appendChatMsg('bot', '<i data-lucide="bot"></i>', 'Sorry, I could not reach WAFEO Intelligence. Please try again.');
-    console.error(err);
-  }
-}
-
-function appendChatMsg(type, avatar, text, id = null, isHtml = false) {
-  const div = document.createElement('div');
-  div.className = `chat-msg ${type}`;
-  if(id) div.id = id;
-  if(id && id.startsWith('typing')) div.classList.add('typing');
-  
-  const content = isHtml ? text : text.replace(/\n/g, '<br>');
-  div.innerHTML = `
-    <div class="cm-avatar">${avatar}</div>
-    <div class="cm-bubble">${content}</div>
-  `;
-  chatWindow.appendChild(div);
-  chatWindow.scrollTop = chatWindow.scrollHeight;
-}
 
 // ─── ADMIN: Load User Profiles ───────────────────────────
 async function loadAdminUsers() {

@@ -54,6 +54,10 @@
       "use": "@vercel/static"
     },
     {
+      "src": "assistant.js",
+      "use": "@vercel/static"
+    },
+    {
       "src": "landing.js",
       "use": "@vercel/static"
     },
