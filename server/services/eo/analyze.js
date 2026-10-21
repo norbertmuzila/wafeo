@@ -118,7 +118,7 @@ async function analyzeSite(body) {
 
   const analysis = interpret(data);
   const result = {
-    schema: 3, // bump when the result format changes; browsers drop older saved analyses
+    schema: 4, // bump when the result format changes; browsers drop older saved analyses
     generatedAt: now.toISOString(),
     aoi: { geometry: aoi, areaHa: Math.round(geo.areaHa(aoi) * 10) / 10, centroid: c },
     ...analysis,
@@ -221,14 +221,15 @@ function interpret(d) {
     Object.assign(wq.metrics, { smapSoilMoisture: d.smap.latest.soilMoisture, smapSoilMoisture7d: d.smap.mean7d, smapDate: d.smap.latest.date });
     if (!drySeason && sm < 0.1) add('water', sm < 0.06 ? 'high' : 'medium', 'Satellite shows very dry topsoil (SMAP)', `Surface soil moisture about ${sm} m³/m³ over the last week.`, `SMAP ${d.smap.latest.date}`);
   }
-  // Root-zone water relative to this soil's available-water range.
-  const topSoil = d.soil?.layers?.['15-30cm'] || d.soil?.layers?.['0-5cm'];
-  const theta = wx?.soilMoisture?.['9-27cm'];
-  if (topSoil?.water && Number.isFinite(theta)) {
-    const { fieldCapacity: fc, wiltingPoint: wp } = topSoil.water;
-    const rel = clamp((theta - wp) / Math.max(0.01, fc - wp), 0, 1.2);
-    wq.metrics.rootZoneAvailableWaterPct = Math.min(100, Math.round(rel * 100));
-    if (rel < 0.3) add('water', rel < 0.15 ? 'high' : 'medium', 'Root-zone soil is near wilting point', `Only ~${Math.round(rel * 100)}% of plant-available water remains at 9–27 cm.`, 'Open-Meteo soil moisture + SoilGrids water capacity');
+  // Root-zone (7–28 cm) wetness against this spot's own 10-year record
+  // (0% = driest, 100% = wettest it gets), from reanalysis soil moisture.
+  const rz = d.rainfall?.rootZone;
+  if (rz && Number.isFinite(rz.wetnessPct)) {
+    const rel = rz.wetnessPct / 100;
+    wq.metrics.rootZoneAvailableWaterPct = rz.wetnessPct;
+    if (Number.isFinite(rz.seasonalPercentile)) wq.metrics.rootZoneSeasonalPercentile = rz.seasonalPercentile;
+    if (!drySeason && rel < 0.25) add('water', rel < 0.12 ? 'high' : 'medium', 'Root-zone soil is very dry', `Soil water at 7–28 cm is at ${rz.wetnessPct}% of its usual range here (0% = the driest in 10 years).`, `ERA5 soil moisture to ${rz.date}`);
+    if (Number.isFinite(rz.seasonalPercentile) && rz.seasonalPercentile <= 10 && !drySeason) add('water', 'medium', 'Soil drier than usual for this time of year', `Root-zone soil water is lower than in ${100 - rz.seasonalPercentile}% of years at this time of year.`, `ERA5 soil moisture to ${rz.date}`);
     wq.score = clamp(wq.score * 0.6 + rel * 100 * 0.4, 0, 100);
   }
   // Open water today vs its historical extent.
@@ -401,7 +402,7 @@ function waterQuantitySummary(m, drySeason) {
   const parts = [];
   if (m.rain90PctNormal !== undefined && m.rain90PctNormal !== null && !drySeason) parts.push(`Rainfall over 90 days is ${m.rain90PctNormal}% of normal`);
   if (drySeason) parts.push('It is the dry season here, so low rainfall is expected');
-  if (Number.isFinite(m.rootZoneAvailableWaterPct)) parts.push(`root-zone soil holds ~${m.rootZoneAvailableWaterPct}% of its available water`);
+  if (Number.isFinite(m.rootZoneAvailableWaterPct)) parts.push(`root-zone soil water is at ${m.rootZoneAvailableWaterPct}% of its usual range here${Number.isFinite(m.rootZoneSeasonalPercentile) ? ` (${m.rootZoneSeasonalPercentile >= 60 ? 'wetter' : m.rootZoneSeasonalPercentile <= 40 ? 'drier' : 'about normal'} for the time of year)` : ''}`);
   if (Number.isFinite(m.openWaterPctOfHistoricalMax)) parts.push(`open water is at ${m.openWaterPctOfHistoricalMax}% of its historical maximum`);
   if (Number.isFinite(m.rainNext16Mm)) parts.push(`${m.rainNext16Mm} mm of rain is forecast for the next 16 days`);
   return parts.length ? parts.join('; ') + '.' : 'Water data unavailable.';

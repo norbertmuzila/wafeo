@@ -14,7 +14,7 @@
   const FIELD_ZOOM = 13; // clicks at this zoom or closer trace the field outline
   const layers = { aoi: null, draft: null, vertices: [] };
 
-  const SCHEMA = 3; // must match server/services/eo/analyze.js
+  const SCHEMA = 4; // must match server/services/eo/analyze.js
   try { state.last = JSON.parse(localStorage.getItem(STORE_KEY) || 'null'); } catch (e) { state.last = null; }
   // Saved results from an older engine version are discarded, never shown.
   if (state.last && state.last.schema !== SCHEMA) { state.last = null; try { localStorage.removeItem(STORE_KEY); } catch (e) {} }
@@ -37,7 +37,7 @@
     rain90Mm: 'Rain, last 90 days (mm)', rain90NormalMm: 'Normal for those 90 days (mm)', rain90PctNormal: 'Last 90 days, % of normal', spi90: 'SPI-90 (drought index)',
     season: 'Season', waterBalance30Mm: 'Rain − evaporation, last 30 days (mm)', et0Past30Mm: 'Evaporative demand ET₀, last 30 days (mm)',
     rainNext16Mm: 'Rain forecast, next 16 days (mm)', et0Next16Mm: 'ET₀ forecast, next 16 days (mm)', waterBalanceNext16Mm: 'Rain − ET₀, next 16 days (mm)',
-    hotDaysNext16: 'Days ≥ 35 °C, next 16 days', soilMoisture: 'Modelled soil moisture (m³/m³)', rootZoneAvailableWaterPct: 'Root-zone available water, %',
+    hotDaysNext16: 'Days ≥ 35 °C, next 16 days', soilMoisture: 'Modelled soil moisture (m³/m³)', rootZoneAvailableWaterPct: 'Root-zone soil water, % of local 10-year range', rootZoneSeasonalPercentile: 'Root-zone soil water vs same season (percentile)',
     openWaterNowHa: 'Open water now (ha)', waterHistoricalMaxHa: 'Largest water extent since 1984 (ha)', waterPermanentHa: 'Permanent water (ha)',
     openWaterPctOfHistoricalMax: 'Open water, % of historical max', riverDischargeM3s: 'River discharge (m³/s)', riverPctOfMedian: 'River flow, % of median',
     riverForecastPeakPctOfMedian: '14-day peak flow, % of median', groundwater: 'Groundwater',
@@ -120,6 +120,22 @@
         document.querySelectorAll('.si-tab-btn').forEach(x => x.classList.remove('active'));
         document.querySelectorAll('.si-tab-content').forEach(c => { c.style.display = 'none'; });
         b.classList.add('active'); pane.style.display = 'block';
+      });
+    }
+    // Change over time: then vs now with a period slider (compare.js).
+    if (tabs && !tabs.querySelector('[data-tab="change"]')) {
+      const b = document.createElement('button');
+      b.className = 'si-tab-btn'; b.dataset.tab = 'change'; b.textContent = 'Change over time';
+      tabs.insertBefore(b, tabs.querySelector('[data-tab="sources"]'));
+      const pane = document.createElement('div');
+      pane.className = 'si-tab-content'; pane.id = 'siTab-change'; pane.style.cssText = 'padding:16px; display:none;';
+      document.querySelector('#pg-site-intelligence .si-data-panel').appendChild(pane);
+      if (window.wafeoCompare) window.wafeoCompare.mount(pane, { compact: true });
+      b.addEventListener('click', () => {
+        document.querySelectorAll('.si-tab-btn').forEach(x => x.classList.remove('active'));
+        document.querySelectorAll('.si-tab-content').forEach(c => { c.style.display = 'none'; });
+        b.classList.add('active'); pane.style.display = 'block';
+        if (window.wafeoCompare) window.wafeoCompare.refresh();
       });
     }
   }

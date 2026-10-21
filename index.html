@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>WAFEO · See water. Grow food. Save lives.</title>
+<title>WAFEO</title>
 <meta name="description" content="WAFEO turns satellite data into field-level intelligence on water, crops and food security.">
 <meta property="og:image" content="assets/landing/field-hero.webp">
 <link rel="preload" as="image" href="assets/landing/field-hero.webp" fetchpriority="high">
@@ -25,7 +25,7 @@
 <script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js" defer></script>
-<link rel="stylesheet" href="style.css?v=24">
+<link rel="stylesheet" href="style.css?v=25">
 <link rel="stylesheet" href="landing.css?v=5">
 </head>
 <body>
@@ -234,7 +234,7 @@
     </section>
 
     <footer class="lp-footer">
-      <span>© 2026 <b>WAFEO</b> · Created by Norbert Muzila</span>
+      <span>© 2026 <b>WAFEO</b></span>
       <span class="lp-mono">Water · Agriculture · Food security · EO</span>
       <span class="lp-mono">Powered by Copernicus &amp; NASA open data · <a href="/privacy" style="text-decoration:underline">Privacy</a></span>
     </footer>
@@ -506,6 +506,7 @@
           </div>
         </div>
         <div class="lv-host"></div>
+        <div id="dashCompare" class="dash-compare"></div>
       </div>
     </div>
 
@@ -662,7 +663,7 @@
 
 <!-- ═══════════════ FIXED FOOTER BAR ═══════════════ -->
 <div id="platformFooter" class="platform-footer">
-  <div class="footer-left">CREATED BY <strong>NORBERT MUZILA</strong></div>
+  <div class="footer-left" aria-hidden="true"></div>
   <div class="footer-center">Water&nbsp;<span class="footer-sep">|</span>&nbsp;Agriculture&nbsp;<span class="footer-sep">|</span>&nbsp;Food Security&nbsp;<span class="footer-sep">|</span>&nbsp;EO</div>
   <div class="footer-right">© 2026 <span style="color:var(--accent-blue); font-weight:700;">WAFEO</span></div>
 </div>
@@ -670,10 +671,11 @@
 <!-- ═══════════════ WATER ANALYTICS MODAL ═══════════════ -->
 
 
-<script src="app.js?v=25"></script>
-<script src="eo.js?v=7"></script>
+<script src="app.js?v=26"></script>
+<script src="eo.js?v=8"></script>
 <script src="atlas.js?v=2"></script>
-<script src="report.js?v=2"></script>
+<script src="compare.js?v=1"></script>
+<script src="report.js?v=3"></script>
 <script src="livenews.js?v=1"></script>
 <script src="pages.js?v=7"></script>
 <script src="https://cdn.jsdelivr.net/npm/lenis@1.1.13/dist/lenis.min.js"></script>

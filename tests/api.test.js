@@ -174,3 +174,12 @@ test('news rejects invalid dates without calling sources', async () => {
   assert.strictEqual((await call('GET', '/api/news?date=yesterday', { token })).status, 400);
   assert.strictEqual((await call('GET', '/api/news')).status, 401);
 });
+
+test('change comparison validates sign-in, area and period', async () => {
+  assert.strictEqual((await call('POST', '/api/eo/compare', { body: { point: [31.35, -17.85], months: 12 } })).status, 401);
+  const token = await login('farmer');
+  assert.strictEqual((await call('POST', '/api/eo/compare', { token, body: { months: 12 } })).status, 400);
+  const bad = await call('POST', '/api/eo/compare', { token, body: { point: [31.35, -17.85], radius_m: 500, months: 0 } });
+  assert.strictEqual(bad.status, 400);
+  assert.match(bad.json.error, /period/);
+});

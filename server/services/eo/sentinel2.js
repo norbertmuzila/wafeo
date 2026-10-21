@@ -240,4 +240,4 @@ function sceneInfo(pick) {
 
 const round = (v, d = 3) => (Number.isFinite(v) ? Math.round(v * 10 ** d) / 10 ** d : null);
 
-module.exports = { analyzeLatest, ndviInWindow, ndviSeries };
+module.exports = { analyzeLatest, ndviInWindow, ndviSeries, _internal: { reflectanceFn, fieldImages, epsgOf } };

@@ -18,6 +18,7 @@ landing.css, landing.js         Home page: pinned scroll hero, sections, hand-of
 eo.js                           Site Intelligence analysis UI (click a field, point + radius, or draw)
 atlas.js                        Dashboard world map: rotating globe / flat map, 208-country atlas with flags,
                                 country cards (World Bank statistics, hazards), click-to-select a field
+compare.js                      Change over time: period slider and then/now swipe viewer (Dashboard, Site Intelligence)
 livenews.js                     Live News panel (Reports): auto-refresh, date archive, region and topic filters
 report.js                       PDF report "Analysis_Report_WAFEO_<area>.pdf" (jsPDF)
 pages.js                        Live Dashboard and domain pages (plain + expert views, charts, maps)
@@ -104,6 +105,7 @@ All endpoints except health and auth require `Authorization: Bearer <token>`.
 | GET | `/api/auth/me` | Restore session, returns a fresh token |
 | POST | `/api/eo/analyze` | Live satellite, soil, weather, FEWS NET and GDACS analysis of `{ point, radius_m }` or `{ geometry }` |
 | GET | `/api/eo/field?lon=&lat=` | Traces the field under a map click from the latest clear Sentinel-2 image (10 m): returns its outline polygon and area |
+| POST | `/api/eo/compare` | Then vs now for `{ point, radius_m } | { geometry }` and `months` (1–96): matching pictures, change map, statistics and findings |
 | POST | `/api/eo/ndvi-series` | 24 months of Sentinel-2 NDVI for the same area |
 | GET | `/api/live/hazards` | Live GDACS hazard alerts (drought, flood, cyclone, volcano, wildfire) |
 | GET | `/api/news` · `/api/news?date=YYYY-MM-DD` | Verified news on water, agriculture, food security and climate hazards: live (refreshed every 3 minutes) or for any date since 2015 |
@@ -133,6 +135,11 @@ On the **Dashboard** map, zoom in until fields are visible and click inside one:
 | NISAR (NASA/ISRO) | 200 m radar soil moisture | Not connected: provisional data is only offered as ~130 MB files with no per-area access |
 
 Results appear on the Crop, Precision Farming, Soil, Water, Drought, Early Warning and Food Security pages. **Download PDF report** (on every page's site bar, Site Intelligence and Reports) creates `Analysis_Report_WAFEO_<area>.pdf`: A4, 12 pt justified text in Helvetica (the PDF standard font with Arial's metrics), the colour-analysed field (vegetation-health map and natural-colour image), every reading with its plain meaning, priority findings, two-year greenness chart, 16-day outlook, nearby hazards and actions for farmers, government and the public. It reports results only; data-source names are left out.
+
+## Testing
+
+- `npm test`: unit and API tests (offline, no external services).
+- `npm run e2e` (or `npm run e2e -- http://localhost:8080`): end-to-end check of a running site with live data: assets, sign-in rules, demo, field tracing, analysis plausibility, change over time, news and the AI assistant.
 
 ## Security notes
 

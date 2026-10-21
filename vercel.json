@@ -42,6 +42,10 @@
       "use": "@vercel/static"
     },
     {
+      "src": "compare.js",
+      "use": "@vercel/static"
+    },
+    {
       "src": "report.js",
       "use": "@vercel/static"
     },

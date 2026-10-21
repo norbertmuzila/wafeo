@@ -13,6 +13,12 @@ const userLimiter = rateLimit({ windowMs: 60 * 1000, max: 6, key: req => 'eo' + 
 // Demo sessions are anonymous, so they are also limited per IP address.
 const demoLimiter = rateLimit({ windowMs: 60 * 60 * 1000, max: 30, key: req => 'eo-demo' + req.ip });
 const limiter = (req, res, next) => (req.user.role === 'demo' ? demoLimiter(req, res, () => userLimiter(req, res, next)) : userLimiter(req, res, next));
+// History and then-vs-now comparisons are lighter and are used together with
+// an analysis (and again when the period slider moves), so they get their own,
+// larger allowance instead of sharing the analysis limit.
+const extraUser = rateLimit({ windowMs: 60 * 1000, max: 20, key: req => 'eo-x' + req.user.id });
+const extraDemo = rateLimit({ windowMs: 60 * 60 * 1000, max: 90, key: req => 'eo-x-demo' + req.ip });
+const extraLimiter = (req, res, next) => (req.user.role === 'demo' ? extraDemo(req, res, () => extraUser(req, res, next)) : extraUser(req, res, next));
 const fieldLimiter = rateLimit({ windowMs: 60 * 1000, max: 20, key: req => 'field' + (req.user.role === 'demo' ? req.ip : req.user.id) });
 
 // Click on the map: trace the outline of the field under the click.
@@ -42,7 +48,7 @@ const { normalizeAoi } = require('../services/eo/geo');
 const { ndviSeries } = require('../services/eo/sentinel2');
 const seriesCache = new Map();
 
-router.post('/eo/ndvi-series', limiter, async (req, res) => {
+router.post('/eo/ndvi-series', extraLimiter, async (req, res) => {
   try {
     const aoi = normalizeAoi(req.body || {});
     const key = JSON.stringify(aoi.coordinates[0].map(([x, y]) => [x.toFixed(4), y.toFixed(4)])) + new Date().toISOString().slice(0, 10);
@@ -57,6 +63,19 @@ router.post('/eo/ndvi-series', limiter, async (req, res) => {
     if (err.status) return res.status(err.status).json({ error: err.message });
     console.error('[eo] NDVI series failed:', err);
     res.status(500).json({ error: 'Could not build the NDVI time series. Please try again.' });
+  }
+});
+
+// Then vs now: the same area N months ago and today (1 month to 8 years).
+const { compare } = require('../services/eo/change');
+router.post('/eo/compare', extraLimiter, async (req, res) => {
+  try {
+    const aoi = normalizeAoi(req.body || {});
+    res.json(await compare(aoi, (req.body || {}).months));
+  } catch (err) {
+    if (err.status) return res.status(err.status).json({ error: err.message });
+    console.error('[eo] comparison failed:', err);
+    res.status(500).json({ error: 'The comparison could not be completed. Please try again.' });
   }
 });
 

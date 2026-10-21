@@ -10,7 +10,8 @@
     "start": "node server.js",
     "dev": "node --watch-path=server --watch-path=server.js --watch-path=lib server.js",
     "test": "node --test tests/*.test.js",
-    "seed": "node firebase-seed.js"
+    "seed": "node firebase-seed.js",
+    "e2e": "node tests/e2e.js"
   },
   "dependencies": {
     "compression": "^1.7.4",

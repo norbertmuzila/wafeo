@@ -44,7 +44,7 @@ async function rainfallAnomaly([lon, lat], recent, now = new Date()) {
   const end = daysAgo(6, now); // ERA5 lags by ~5 days
   const url = 'https://archive-api.open-meteo.com/v1/archive' +
     `?latitude=${lat.toFixed(4)}&longitude=${lon.toFixed(4)}` +
-    `&start_date=2001-01-01&end_date=${isoDay(end)}&daily=precipitation_sum&timezone=auto`;
+    `&start_date=2001-01-01&end_date=${isoDay(end)}&daily=precipitation_sum,soil_moisture_7_to_28cm_mean&timezone=auto`;
   const j = await getJson(url, { timeout: 25000 });
   const byDay = new Map(j.daily.time.map((t, i) => [t, j.daily.precipitation_sum[i]]));
   const windowSum = (endDate, days) => {
@@ -72,7 +72,39 @@ async function rainfallAnomaly([lon, lat], recent, now = new Date()) {
     };
   }
   result.baseline = `ERA5 reanalysis, 2001–${now.getUTCFullYear() - 1}, window ending ${isoDay(end)}`;
+  result.rootZone = rootZoneWetness(j.daily, end);
   return { available: true, ...result };
+}
+
+// Root-zone (7–28 cm) soil wetness from the same reanalysis, compared with
+// this spot's own record: model soil moisture is on the model's own scale, so
+// it is only meaningful against its own driest and wettest values, never
+// against the field capacity of a soil map.
+function rootZoneWetness(daily, end) {
+  const t = daily.time, v = daily.soil_moisture_7_to_28cm_mean;
+  if (!Array.isArray(v)) return null;
+  let last = -1;
+  for (let i = v.length - 1; i >= 0; i--) if (Number.isFinite(v[i])) { last = i; break; }
+  if (last < 0) return null;
+  const recent = v.slice(Math.max(0, last - 2), last + 1).filter(Number.isFinite);
+  const now = recent.reduce((a, b) => a + b, 0) / recent.length;
+  const cutoff = isoDay(new Date(Date.parse(t[last]) - 10 * 365.25 * 86400000));
+  const record = [], season = [];
+  const doy = d => { const x = new Date(d + 'T00:00:00Z'); return Math.floor((x - Date.UTC(x.getUTCFullYear(), 0, 1)) / 86400000); };
+  const today = doy(t[last]);
+  for (let i = 0; i < v.length; i++) {
+    if (!Number.isFinite(v[i]) || t[i] < cutoff) continue;
+    record.push(v[i]);
+    const gap = Math.abs(doy(t[i]) - today);
+    if (Math.min(gap, 365 - gap) <= 15 && t[i] < t[last].slice(0, 4)) season.push(v[i]);
+  }
+  if (record.length < 365) return null;
+  record.sort((a, b) => a - b);
+  const q = p => record[Math.floor(p * (record.length - 1))];
+  const dry = q(0.02), wet = q(0.98);
+  const wetnessPct = Math.round(Math.max(0, Math.min(1, (now - dry) / Math.max(0.01, wet - dry))) * 100);
+  const seasonalPercentile = season.length >= 60 ? Math.round((season.filter(x => x <= now).length / season.length) * 100) : null;
+  return { wetnessPct, seasonalPercentile, date: t[last], valueM3m3: round(now, 3), driest: round(dry, 3), wettest: round(wet, 3) };
 }
 
 async function riverFlow([lon, lat]) {

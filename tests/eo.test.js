@@ -124,3 +124,39 @@ test('news verification: trusted, on-topic, dated stories only; duplicates merge
   assert.strictEqual(items[0].title, 'Farmers & rain');
   assert.strictEqual(items[0].sourceName, 'Reuters');
 });
+
+test('change over time: change map classes, shares and plain findings', () => {
+  const { changeMap, findings, statsOf } = require('../server/services/eo/change')._internal;
+  // 10 × 10 grid, all inside; left half lost greenness (0.6 → 0.2), right half unchanged (0.4).
+  const W = 10, H = 10, N = W * H;
+  const grid = { width: W, height: H, res: 10, inside: N, mask: new Uint8Array(N).fill(1) };
+  const mk = f => ({ ndvi: Float32Array.from({ length: N }, (_, i) => f(i % W)), water: new Uint8Array(N), clear: new Uint8Array(N).fill(1), rgb: { B02: new Uint16Array(N).fill(1500), B03: new Uint16Array(N).fill(1500), B04: new Uint16Array(N).fill(1500), R: dn => (dn - 1000) / 10000 } });
+  const then = mk(c => (c < 5 ? 0.6 : 0.4)), now = mk(c => (c < 5 ? 0.2 : 0.4));
+  const ch = changeMap(grid, then, now);
+  assert.strictEqual(ch.declinedPct, 50);
+  assert.strictEqual(ch.stablePct, 50);
+  assert.strictEqual(ch.improvedPct, 0);
+  assert.ok(ch.image.startsWith('data:image/png;base64,'));
+  const s0 = statsOf(then, grid), s1 = statsOf(now, grid);
+  assert.strictEqual(s0.meanNdvi, 0.5);
+  assert.strictEqual(s1.meanNdvi, 0.3);
+  assert.strictEqual(s0.greenCoverPct, 100);
+  assert.strictEqual(s1.greenCoverPct, 50);
+  const text = findings({ date: '2023-10-20' }, { date: '2026-10-18' }, s0, s1, ch, 36, 1).join(' ');
+  assert.match(text, /fell from 0.5 to 0.3/);
+  assert.match(text, /50% of the area is less green/);
+  assert.match(text, /same time of year/);
+  const seasonal = findings({ date: '2026-07-20' }, { date: '2026-10-18' }, s0, s1, ch, 3, 1).join(' ');
+  assert.match(seasonal, /different times of year/);
+});
+
+test('root-zone soil water is judged against its own record, not a soil map', () => {
+  const d1 = base(); d1.rainfall.rootZone = { wetnessPct: 55, seasonalPercentile: 100, date: '2026-10-15' };
+  const wet = interpret(d1);
+  assert.strictEqual(wet.domains.waterQuantity.metrics.rootZoneAvailableWaterPct, 55);
+  assert.ok(!wet.issues.some(i => /root-zone soil is very dry/i.test(i.title)));
+  const d2 = base(); d2.rainfall.rootZone = { wetnessPct: 8, seasonalPercentile: 4, date: '2026-01-15' };
+  const dry = interpret(d2);
+  assert.ok(dry.issues.some(i => /root-zone soil is very dry/i.test(i.title) && i.severity === 'high'));
+  assert.ok(dry.issues.some(i => /drier than usual for this time of year/i.test(i.title)));
+});

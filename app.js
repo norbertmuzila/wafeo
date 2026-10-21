@@ -593,6 +593,9 @@ function initSiGlobalMap() {
       const lon = e.latlng.lng;
       analyzeRegion({ lat, lon });
     });
+    // The map is created while its page may be hidden or still laying out:
+    // redraw it whenever its panel changes size, so it is never cut off.
+    if (window.ResizeObserver) new ResizeObserver(() => siMap.invalidateSize()).observe(container);
   }
 }
 
