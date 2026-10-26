@@ -529,16 +529,26 @@ if (siBtn2D && siBtn3D) {
   });
 }
 
+// Satellite imagery for Leaflet maps. Where the sharpest tiles do not exist
+// (much of rural Africa at zoom 18–19), Esri answers 404 instead of a "Map
+// data not yet available" picture, and a coarser layer underneath shows
+// through, enlarged, so zooming in never ends on an empty tile.
+const IMAGERY_URL = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}?blankTile=false';
+function addImagery(m) {
+  L.tileLayer(IMAGERY_URL, { maxNativeZoom: 15, maxZoom: 19, minZoom: 16 }).addTo(m);
+  L.tileLayer(IMAGERY_URL, { maxNativeZoom: 17, maxZoom: 19, minZoom: 18 }).addTo(m);
+  L.tileLayer(IMAGERY_URL, { maxNativeZoom: 19, maxZoom: 19, attribution: 'Imagery &copy; Esri, Maxar, Earthstar Geographics' }).addTo(m);
+}
+window.addImagery = addImagery;
+
 // Map Initialization
 function initSiGlobalMap() {
   const container = document.getElementById('siMapInstance');
   if(!container) return;
   
   if (!siMap) {
-    siMap = L.map('siMapInstance', { zoomControl: false }).setView([15, 10], 2); // Global View
-    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-      attribution: 'Tiles &copy; Esri'
-    }).addTo(siMap);
+    siMap = L.map('siMapInstance', { zoomControl: false, maxZoom: 19 }).setView([15, 10], 2); // Global View
+    addImagery(siMap);
     
     // Map Click Interactivity
     siMap.on('click', async (e) => {

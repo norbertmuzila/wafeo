@@ -26,15 +26,20 @@
       glyphs: 'https://protomaps.github.io/basemaps-assets/fonts/{fontstack}/{range}.pbf',
       sky: { 'atmosphere-blend': ['interpolate', ['linear'], ['zoom'], 0, 0.9, 5, 0.6, 7, 0] },
       sources: {
-        imagery: {
-          type: 'raster', tileSize: 256, maxzoom: 19,
-          tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
-          attribution: 'Imagery © Esri, Maxar, Earthstar Geographics'
-        },
-        places: {
-          type: 'raster', tileSize: 256, maxzoom: 19,
-          tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}']
-        },
+        // Where the sharpest imagery does not exist (much of rural Africa at
+        // zoom 18–19), Esri answers 404 instead of sending a "Map data not yet
+        // available" tile, and the coarser layer underneath shows through,
+        // enlarged (the sharpest of zoom 17 or 15 that exists): zooming in
+        // never ends on an empty picture.
+        'imagery-lo': { type: 'raster', tileSize: 256, maxzoom: 15, tiles: [IMAGERY] },
+        'imagery-mid': { type: 'raster', tileSize: 256, maxzoom: 17, tiles: [IMAGERY] },
+        imagery: { type: 'raster', tileSize: 256, maxzoom: 19, tiles: [IMAGERY], attribution: 'Imagery © Esri, Maxar, Earthstar Geographics' },
+        // Roads, towns, villages and water names from OpenStreetMap.
+        osm: { type: 'vector', url: 'https://tiles.openfreemap.org/planet', attribution: '<a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a> © <a href="https://www.openmaptiles.org/" target="_blank" rel="noopener">OpenMapTiles</a> © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a>' },
+        // Provinces and districts (geoBoundaries) and local names (GeoNames), loaded for the area in view.
+        adm: { type: 'geojson', data: empty(), attribution: 'Boundaries: geoBoundaries' },
+        admLabels: { type: 'geojson', data: empty() },
+        gn: { type: 'geojson', data: empty(), attribution: 'Place names: GeoNames' },
         nasa: {
           type: 'raster', tileSize: 256, maxzoom: 9,
           tiles: [`https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Terra_CorrectedReflectance_TrueColor/default/${gibsDay}/GoogleMapsCompatible_Level9/{z}/{y}/{x}.jpg`],
@@ -45,13 +50,24 @@
         field: { type: 'geojson', data: empty() }
       },
       layers: [
+        { id: 'imagery-lo', type: 'raster', source: 'imagery-lo', minzoom: 15.5, paint: { 'raster-fade-duration': 0 } },
+        { id: 'imagery-mid', type: 'raster', source: 'imagery-mid', minzoom: 17.5, paint: { 'raster-fade-duration': 0 } },
         { id: 'imagery', type: 'raster', source: 'imagery', paint: { 'raster-fade-duration': 150 } },
         { id: 'nasa', type: 'raster', source: 'nasa', layout: { visibility: 'none' }, paint: { 'raster-opacity': 0.95 } },
-        { id: 'places', type: 'raster', source: 'places', minzoom: 6 },
+        ...roadLayers(),
+        {
+          id: 'adm-line', type: 'line', source: 'adm', minzoom: 4,
+          paint: {
+            'line-color': ['match', ['get', 'lvl'], 1, 'rgba(255,255,255,0.85)', 'rgba(255,236,179,0.7)'],
+            'line-width': ['interpolate', ['linear'], ['zoom'], 4, ['match', ['get', 'lvl'], 1, 0.8, 0.5], 10, ['match', ['get', 'lvl'], 1, 2, 1.2]],
+            'line-dasharray': [3, 2]
+          }
+        },
         { id: 'aoi-fill', type: 'fill', source: 'aoi', paint: { 'fill-color': '#9BE07A', 'fill-opacity': 0.2 } },
         { id: 'aoi-line', type: 'line', source: 'aoi', paint: { 'line-color': '#9BE07A', 'line-width': 3 } },
         { id: 'field-fill', type: 'fill', source: 'field', paint: { 'fill-color': '#FFD54F', 'fill-opacity': 0.18 } },
         { id: 'field-line', type: 'line', source: 'field', paint: { 'line-color': '#FFD54F', 'line-width': 2.5, 'line-dasharray': [2, 1] } },
+        ...labelLayers(),
         {
           id: 'hazards', type: 'circle', source: 'hazards',
           paint: {
@@ -64,6 +80,73 @@
     };
   }
   const empty = () => ({ type: 'FeatureCollection', features: [] });
+  const IMAGERY = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}?blankTile=false';
+  const HALO = 'rgba(0,0,0,0.8)';
+  const osmName = ['coalesce', ['get', 'name_en'], ['get', 'name']];
+
+  // Roads drawn lightly over the imagery, like a hybrid map.
+  function roadLayers() {
+    const road = (id, classes, minzoom, color, w) => ({
+      id, type: 'line', source: 'osm', 'source-layer': 'transportation', minzoom,
+      filter: ['match', ['get', 'class'], classes, true, false],
+      layout: { 'line-cap': 'round', 'line-join': 'round' },
+      paint: { 'line-color': color, 'line-width': ['interpolate', ['exponential', 1.5], ['zoom'], minzoom, w[0], 18, w[1]] }
+    });
+    return [
+      { id: 'osm-tracks', type: 'line', source: 'osm', 'source-layer': 'transportation', minzoom: 13, filter: ['match', ['get', 'class'], ['track', 'path'], true, false], paint: { 'line-color': 'rgba(255,255,255,0.5)', 'line-width': 1, 'line-dasharray': [2, 2] } },
+      road('osm-roads-minor', ['minor', 'service'], 11, 'rgba(255,255,255,0.6)', [0.4, 5]),
+      road('osm-roads-major', ['tertiary', 'secondary', 'primary'], 7, 'rgba(255,243,196,0.85)', [0.5, 9]),
+      road('osm-roads-main', ['motorway', 'trunk'], 5, 'rgba(255,212,121,0.95)', [0.8, 12]),
+      { id: 'osm-rail', type: 'line', source: 'osm', 'source-layer': 'transportation', minzoom: 9, filter: ['==', ['get', 'class'], 'rail'], paint: { 'line-color': 'rgba(230,230,230,0.7)', 'line-width': 1.2, 'line-dasharray': [3, 3] } }
+    ];
+  }
+
+  // Names, from least to most important: later layers win when labels collide.
+  function labelLayers() {
+    const text = (size, font = 'Noto Sans Regular') => ({ 'text-font': [font], 'text-size': size, 'text-max-width': 9, 'text-padding': 2 });
+    // GeoNames kinds: 0 city, 1 town, 2 village, 3 area, 4 school, 5 health, 6 other place, 7 water, 8 hill, 9 farm.
+    // Area names may move a little to make room; the largest areas are placed first.
+    const SHIFT = { 'symbol-sort-key': ['-', 0, ['get', 'a']], 'text-variable-anchor': ['center', 'top', 'bottom', 'left', 'right'], 'text-radial-offset': 0.6 };
+    const GN_COLOR = ['match', ['get', 'k'], 4, '#cfe6ff', 5, '#ffd1dc', 7, '#bfe9ff', 8, '#f3dfb6', 9, '#d9f2c6', 3, '#fff2a8', '#ffffff'];
+    const gn = (id, kinds, minzoom, size, opt = {}) => ({
+      id, type: 'symbol', source: 'gn', minzoom,
+      filter: ['match', ['get', 'k'], kinds, true, false],
+      layout: { 'text-field': ['get', 'n'], ...text(size, opt.font), 'text-anchor': opt.anchor || 'center', 'text-offset': opt.offset || [0, 0], 'symbol-sort-key': ['-', 0, ['get', 'p']] },
+      paint: { 'text-color': GN_COLOR, 'text-halo-color': HALO, 'text-halo-width': 1.3 }
+    });
+    return [
+      gn('gn-farm', [9], 14, 10.5, { anchor: 'top', offset: [0, 0.4] }),
+      gn('gn-poi', [4, 5, 6], 13, 11, { anchor: 'top', offset: [0, 0.4] }),
+      { id: 'osm-poi', type: 'symbol', source: 'osm', 'source-layer': 'poi', minzoom: 15, filter: ['has', 'name'], layout: { 'text-field': osmName, ...text(10.5), 'text-anchor': 'top', 'text-offset': [0, 0.4], 'symbol-sort-key': ['get', 'rank'] }, paint: { 'text-color': '#e8eefc', 'text-halo-color': HALO, 'text-halo-width': 1.2 } },
+      { id: 'gn-dot', type: 'circle', source: 'gn', minzoom: 11, filter: ['match', ['get', 'k'], [2, 4, 5, 6, 9], true, false], paint: { 'circle-radius': ['interpolate', ['linear'], ['zoom'], 11, 1.6, 16, 3.2], 'circle-color': GN_COLOR, 'circle-stroke-color': HALO, 'circle-stroke-width': 0.8 } },
+      gn('gn-local', [2, 7, 8], 11, ['interpolate', ['linear'], ['zoom'], 11, 11, 16, 13], { anchor: 'top', offset: [0, 0.35] }),
+      gn('gn-major', [0, 1, 3], 9, ['interpolate', ['linear'], ['zoom'], 9, 12, 14, 14], { font: 'Noto Sans Medium' }),
+      { id: 'osm-road-name', type: 'symbol', source: 'osm', 'source-layer': 'transportation_name', minzoom: 13, layout: { 'text-field': ['coalesce', ['get', 'name_en'], ['get', 'name'], ['get', 'ref']], ...text(10.5), 'symbol-placement': 'line', 'text-rotation-alignment': 'map' }, paint: { 'text-color': '#ffffff', 'text-halo-color': HALO, 'text-halo-width': 1.2 } },
+      { id: 'osm-water-name', type: 'symbol', source: 'osm', 'source-layer': 'water_name', minzoom: 6, layout: { 'text-field': osmName, ...text(11.5, 'Noto Sans Italic') }, paint: { 'text-color': '#bfe9ff', 'text-halo-color': HALO, 'text-halo-width': 1.2 } },
+      { id: 'adm2-label', type: 'symbol', source: 'admLabels', minzoom: 7, maxzoom: 12.5, filter: ['==', ['get', 'lvl'], 2], layout: { 'text-field': ['get', 'n'], ...text(['interpolate', ['linear'], ['zoom'], 7, 11, 11, 13], 'Noto Sans Medium'), 'text-transform': 'uppercase', 'text-letter-spacing': 0.06, ...SHIFT }, paint: { 'text-color': '#ffe9b0', 'text-halo-color': HALO, 'text-halo-width': 1.4 } },
+      {
+        id: 'osm-place', type: 'symbol', source: 'osm', 'source-layer': 'place', minzoom: 4,
+        filter: ['match', ['get', 'class'], ['continent', 'country', 'state', 'province', 'city'], false, true],
+        layout: {
+          'text-field': osmName, 'text-font': ['match', ['get', 'class'], ['city', 'town'], ['literal', ['Noto Sans Medium']], ['literal', ['Noto Sans Regular']]],
+          'text-size': ['interpolate', ['linear'], ['zoom'], 5, ['match', ['get', 'class'], 'city', 12, 'town', 11, 11], 12, ['match', ['get', 'class'], 'city', 17, 'town', 14, 'village', 12.5, 11.5], 16, ['match', ['get', 'class'], 'city', 19, 'town', 16, 'village', 14, 12.5]],
+          'text-max-width': 9, 'text-padding': 2, 'symbol-sort-key': ['get', 'rank']
+        },
+        paint: { 'text-color': '#ffffff', 'text-halo-color': HALO, 'text-halo-width': 1.5 }
+      },
+      { id: 'adm1-label', type: 'symbol', source: 'admLabels', minzoom: 4.5, maxzoom: 8.5, filter: ['==', ['get', 'lvl'], 1], layout: { 'text-field': ['get', 'n'], ...text(['interpolate', ['linear'], ['zoom'], 4.5, 11.5, 8, 15], 'Noto Sans Medium'), 'text-transform': 'uppercase', 'text-letter-spacing': 0.12, ...SHIFT }, paint: { 'text-color': '#ffffff', 'text-halo-color': HALO, 'text-halo-width': 1.6 } },
+      {
+        id: 'osm-city', type: 'symbol', source: 'osm', 'source-layer': 'place', minzoom: 4,
+        filter: ['==', ['get', 'class'], 'city'],
+        layout: {
+          'text-field': osmName, 'text-font': ['match', ['get', 'class'], ['city', 'town'], ['literal', ['Noto Sans Medium']], ['literal', ['Noto Sans Regular']]],
+          'text-size': ['interpolate', ['linear'], ['zoom'], 5, ['match', ['get', 'class'], 'city', 12, 'town', 11, 11], 12, ['match', ['get', 'class'], 'city', 17, 'town', 14, 'village', 12.5, 11.5], 16, ['match', ['get', 'class'], 'city', 19, 'town', 16, 'village', 14, 12.5]],
+          'text-max-width': 9, 'text-padding': 2, 'symbol-sort-key': ['get', 'rank']
+        },
+        paint: { 'text-color': '#ffffff', 'text-halo-color': HALO, 'text-halo-width': 1.5 }
+      }
+    ];
+  }
 
   // ─── Setup ─────────────────────────────────────────────────
   // MapLibre (~250 KB) loads only when the map is first needed, and is fetched
@@ -95,6 +178,9 @@
     map.on('styleimagemissing', loadFlag);
     map.on('load', () => {
       loadCountries(); spin();
+      // Keep the credits folded behind the (i) button so they do not cover the map.
+      const credits = map.getContainer().querySelector('.maplibregl-ctrl-attrib');
+      if (credits) credits.classList.remove('maplibregl-compact-show');
       // Data that arrived before the map existed.
       if (hazards.length) setHazards(hazards);
       if (aoi) setAoi(aoi, true);
@@ -102,6 +188,7 @@
     // Spin again only once every other camera movement has finished.
     map.on('moveend', () => setTimeout(spin, 60));
     map.on('zoomend', updateHint);
+    map.on('moveend', () => { clearTimeout(detailTimer); detailTimer = setTimeout(refreshDetail, 250); });
     map.on('click', onClick);
     map.on('mousemove', onHover);
     map.on('mouseleave', 'country-fill', () => setHover(null));
@@ -177,7 +264,104 @@
         paint: { 'line-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#9BE07A', 'rgba(255,255,255,0.55)'], 'line-width': ['interpolate', ['linear'], ['zoom'], 1, ['case', ['boolean', ['feature-state', 'selected'], false], 2.4, 0.4], 6, ['case', ['boolean', ['feature-state', 'selected'], false], 2.6, 1.1]] }
       }, before);
       if (selectedCc) paintSelected(selectedCc);
+      refreshDetail();
     } catch (e) { console.warn('Country borders failed to load:', e); }
+  }
+
+  // ─── Provinces, districts and local names for the area in view ──
+  // Loaded per country as the map is zoomed in: provinces from zoom 4,
+  // districts from 6.5, and villages, schools, hills and dams from zoom 9.
+  let detailTimer = null, countryBoxes = null;
+  const admLoaded = new Map();   // 'ZWE-1' → { areas, labels } (null while loading)
+  const gnLoaded = new Map();    // 'ZW:31,-18' → features (null while loading)
+  const GEO_ISO3 = { UNK: 'XKX' };
+
+  function bboxOf(g) {
+    let a = [180, 90, -180, -90];
+    const walk = c => { if (typeof c[0] === 'number') { a = [Math.min(a[0], c[0]), Math.min(a[1], c[1]), Math.max(a[2], c[0]), Math.max(a[3], c[1])]; } else c.forEach(walk); };
+    walk(g.coordinates);
+    return a;
+  }
+  function inRing([x, y], ring) {
+    let c = false;
+    for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+      const [xi, yi] = ring[i], [xj, yj] = ring[j];
+      if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) c = !c;
+    }
+    return c;
+  }
+  const contains = (g, p) => (g.type === 'Polygon' ? [g.coordinates] : g.coordinates).some(poly => inRing(p, poly[0]));
+
+  // Countries overlapping the view, the one under the centre first.
+  function countriesInView() {
+    countryBoxes = countryBoxes || shapes.features.filter(f => f.properties.cc && f.geometry).map(f => ({ cc: f.properties.cc, g: f.geometry, box: bboxOf(f.geometry) }));
+    const b = map.getBounds(), c = map.getCenter();
+    const w = b.getWest(), e = b.getEast(), s = b.getSouth(), n = b.getNorth();
+    const best = new Map();
+    for (const x of countryBoxes) {
+      if (x.box[0] > e || x.box[2] < w || x.box[1] > n || x.box[3] < s) continue;
+      const d = contains(x.g, [c.lng, c.lat]) ? -1 : Math.hypot(Math.max(x.box[0] - c.lng, 0, c.lng - x.box[2]), Math.max(x.box[1] - c.lat, 0, c.lat - x.box[3]));
+      const prev = best.get(x.cc);
+      if (!prev || d < prev.d) best.set(x.cc, { cc: x.cc, d, box: x.box });
+    }
+    return [...best.values()].sort((p, q) => p.d - q.d);
+  }
+
+  function refreshDetail() {
+    if (!map || !map.getSource('adm') || !shapes) return;
+    const z = map.getZoom();
+    if (z < 4) return;
+    const near = countriesInView().slice(0, z >= 7 ? 3 : 2);
+    for (const { cc } of near) {
+      const c = byCc.get(cc);
+      if (!c || !c.iso3) continue;
+      loadAdmin(c.iso3, 1);
+      if (z >= 6.5) loadAdmin(c.iso3, 2);
+    }
+    if (z >= 9) loadPlaces(near);
+  }
+
+  async function loadAdmin(iso3, level) {
+    const key = `${iso3}-${level}`;
+    if (admLoaded.has(key)) return;
+    admLoaded.set(key, null);
+    try {
+      const res = await fetch(`${API}/geo/admin?iso3=${GEO_ISO3[iso3] || iso3}&level=${level}`, { signal: AbortSignal.timeout(45000) });
+      if (!res.ok) throw new Error(res.status);
+      const r = await res.json();
+      if (!r.available) return;                                         // stays marked: nothing to load
+      const tag = f => ({ ...f, properties: { ...f.properties, lvl: level } });
+      admLoaded.set(key, { areas: r.areas.features.map(tag), labels: r.labels.features.map(tag) });
+      while (admLoaded.size > 12) admLoaded.delete(admLoaded.keys().next().value);
+      const ready = [...admLoaded.values()].filter(Boolean);
+      map.getSource('adm').setData({ type: 'FeatureCollection', features: ready.flatMap(x => x.areas) });
+      map.getSource('admLabels').setData({ type: 'FeatureCollection', features: ready.flatMap(x => x.labels) });
+    } catch (e) {
+      admLoaded.delete(key);                                            // try again on the next move
+    }
+  }
+
+  async function loadPlaces(near) {
+    const b = map.getBounds();
+    const jobs = [];
+    for (let x = Math.floor(b.getWest()); x <= Math.floor(b.getEast()); x++) {
+      for (let y = Math.floor(b.getSouth()); y <= Math.floor(b.getNorth()); y++) {
+        for (const { cc, box } of near) {
+          if (box[0] > x + 1 || box[2] < x || box[1] > y + 1 || box[3] < y) continue;
+          const key = `${cc}:${x},${y}`;
+          if (gnLoaded.has(key) || jobs.length >= 24) continue;
+          gnLoaded.set(key, null);
+          jobs.push(fetch(`${API}/geo/places?cc=${cc.toUpperCase()}&cell=${x},${y}`, { signal: AbortSignal.timeout(60000) })
+            .then(res => (res.ok ? res.json() : Promise.reject(new Error(res.status))))
+            .then(r => gnLoaded.set(key, r.places.map(([n, lon, lat, k, p]) => ({ type: 'Feature', properties: { n, k, p }, geometry: { type: 'Point', coordinates: [lon, lat] } }))))
+            .catch(() => gnLoaded.delete(key)));
+        }
+      }
+    }
+    if (!jobs.length) return;
+    await Promise.all(jobs);
+    while (gnLoaded.size > 80) gnLoaded.delete(gnLoaded.keys().next().value);   // bound memory on long sessions
+    map.getSource('gn').setData({ type: 'FeatureCollection', features: [...gnLoaded.values()].filter(Boolean).flat() });
   }
 
   // Flags load on demand, only for labels the map actually shows.
@@ -276,6 +460,7 @@
         <div><dt>Capital</dt><dd>${esc(c.capital || '—')}</dd></div>
         <div><dt>Area</dt><dd>${Math.round(c.areaKm2 || 0).toLocaleString()} km²${c.landlocked ? ' · landlocked' : ''}</dd></div>
         <div><dt>Main languages</dt><dd>${esc(c.languages.join(', ') || '—')}</dd></div>
+        <div><dt>Currency</dt><dd>${esc(c.currency || '—')}</dd></div>
       </dl>
       <h4>Farming, water and food</h4>
       <dl class="atlas-facts" id="atlasWb"><div class="atlas-loading">Loading latest national statistics…</div></dl>

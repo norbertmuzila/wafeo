@@ -52,6 +52,8 @@ async function req(method, path, body, { auth = true, timeout = 90000 } = {}) {
         const langs = cc => (r.json.find(c => c.cc === cc) || {}).languages || [];
         expect(langs('zw').join() === 'Shona,English,Ndebele', 'Zimbabwe: ' + langs('zw').join(', '));
         expect(!langs('zw').some(l => /Chibarwe|Chewa/i.test(l)), 'Zimbabwe lists a minority language as main');
+        const zw = r.json.find(c => c.cc === 'zw');
+        expect(/Zimbabwean Gold/.test(zw.currency) && !/pula/i.test(zw.currency), 'Zimbabwe currency: ' + zw.currency);
         expect(langs('ke').includes('Swahili') && langs('ke').includes('English'), 'Kenya: ' + langs('ke').join(', '));
         expect(langs('za').includes('isiZulu') && langs('za').length <= 4, 'South Africa: ' + langs('za').join(', '));
         expect(r.json.filter(c => c.cc !== 'aq').every(c => c.languages.length >= 1 && c.languages.length <= 4), 'a country has no or too many languages');
@@ -61,7 +63,7 @@ async function req(method, path, body, { auth = true, timeout = 90000 } = {}) {
   }
 
   console.log('\nAccounts and security');
-  await check('health check', async () => { const r = await req('GET', '/api/health', null, { auth: false }); expect(r.status === 200 && r.json.status === 'ok', r.text.slice(0, 120)); return `store ${r.json.store}, AI ${r.json.ai ? 'on' : 'off'}`; });
+  await check('health check', async () => { const r = await req('GET', '/api/health', null, { auth: false }); expect(r.status === 200 && r.json.status === 'ok', r.text.slice(0, 120)); return `store ${r.json.store}, AI ${r.json.aiConfigured ? 'on' : 'off'}`; });
   await check('private files are not served', async () => {
     for (const [p, secret] of [['/.env', /^(JWT_SECRET|GROQ_API_KEY|EARTHDATA_TOKEN)=/m], ['/server/config.js', /module\.exports/], ['/data/users.json', /"password":\s*"/], ['/package.json', /"dependencies":/]]) {
       const r = await req('GET', p, null, { auth: false, timeout: 20000 });
@@ -145,6 +147,32 @@ async function req(method, path, body, { auth = true, timeout = 90000 } = {}) {
     expect(r.status === 400, 'status ' + r.status);
   });
   await check('live hazards feed', async () => { const r = await req('GET', '/api/live/hazards'); expect(r.status === 200 && Array.isArray(r.json.events), r.text.slice(0, 120)); return `${r.json.events.length} events`; });
+
+  console.log('\nMap detail');
+  await check('provinces of Zimbabwe, without signing in', async () => {
+    const r = await req('GET', '/api/geo/admin?iso3=ZWE&level=1', null, { auth: false, timeout: 60000 });
+    const names = (r.json.labels?.features || []).map(f => f.properties.n);
+    expect(r.status === 200 && names.includes('Mashonaland East') && names.length === 10, `${r.status} ${names.join(', ')}`);
+    return names.length + ' provinces';
+  });
+  await check('districts of Zimbabwe', async () => {
+    const r = await req('GET', '/api/geo/admin?iso3=ZWE&level=2', null, { auth: false, timeout: 60000 });
+    const names = (r.json.labels?.features || []).map(f => f.properties.n);
+    expect(r.status === 200 && ['Goromonzi', 'Murehwa', 'Marondera'].every(n => names.includes(n)), `${r.status} ${names.length} districts`);
+    expect(r.json.areas.features.length === names.length, 'some district outlines are missing');
+    return `${names.length} districts, ${Math.round(r.text.length / 1024)} KB`;
+  });
+  await check('local names around Mhembere, Mashonaland East', async () => {
+    const r = await req('GET', '/api/geo/places?cc=ZW&cell=31,-18', null, { auth: false, timeout: 60000 });
+    const hit = (r.json.places || []).find(p => p[0] === 'Mhembere School');
+    expect(r.status === 200 && hit && Math.abs(hit[1] - 31.571) < 0.01 && Math.abs(hit[2] + 17.63) < 0.01, `${r.status} ${r.text.slice(0, 120)}`);
+    return `${r.json.places.length} names in the 1° cell`;
+  });
+  await check('map data refuses bad requests', async () => {
+    const a = await req('GET', '/api/geo/admin?iso3=Z&level=9', null, { auth: false });
+    const b = await req('GET', '/api/geo/places?cc=ZWE&cell=x', null, { auth: false });
+    expect(a.status === 400 && b.status === 400, `${a.status} ${b.status}`);
+  });
 
   console.log('\nNews');
   await check('live news: verified, on-topic, recent, includes Zimbabwe', async () => {

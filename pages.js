@@ -266,8 +266,8 @@
     const el = document.getElementById(id);
     if (!el || typeof L === 'undefined') return null;
     if (maps.has(id)) { maps.get(id).remove(); maps.delete(id); }
-    const m = L.map(el, { zoomControl: true, attributionControl: true, scrollWheelZoom: false });
-    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: 'Imagery © Esri', maxZoom: 18 }).addTo(m);
+    const m = L.map(el, { zoomControl: true, attributionControl: true, scrollWheelZoom: false, maxZoom: 19 });
+    addImagery(m);
     const poly = L.polygon(a.aoi.geometry.coordinates[0].map(([x, y]) => [y, x]), { color: '#9BE07A', weight: 2, fillOpacity: 0.12 }).addTo(m);
     if (extra) extra(m);
     m.fitBounds(poly.getBounds(), { padding: [20, 20], maxZoom: 16 });

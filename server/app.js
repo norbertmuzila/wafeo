@@ -49,6 +49,7 @@ app.use('/api', (req, res, next) => config.jwtSecret ? next() : res.status(503).
   error: 'Server is missing JWT_SECRET. The site administrator must set it in the deployment environment.'
 }));
 
+app.use('/api/geo', require('./routes/geo'));
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api', require('./routes/data'));
 app.use('/api', require('./routes/platform'));
