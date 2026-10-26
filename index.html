@@ -13,20 +13,16 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin="" defer></script>
 <!-- Google Identity Services -->
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <!-- Chart.js for Water Body Analytics -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer></script>
 <!-- TensorFlow.js for the LSTM NDVI forecast -->
-<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.6.0/dist/maplibre-gl.css">
-<script src="https://unpkg.com/maplibre-gl@5.6.0/dist/maplibre-gl.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
-<script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js" defer></script>
-<link rel="stylesheet" href="style.css?v=28">
-<link rel="stylesheet" href="landing.css?v=5">
+<!-- The map library (atlas.js) and PDF tools (report.js) load on demand. -->
+<script src="icons.js?v=1" defer></script>
+<link rel="stylesheet" href="style.css?v=35">
+<link rel="stylesheet" href="landing.css?v=7">
 </head>
 <body>
 
@@ -648,15 +644,15 @@
 <!-- ═══════════════ WATER ANALYTICS MODAL ═══════════════ -->
 
 
-<script src="app.js?v=27"></script>
-<script src="eo.js?v=8"></script>
-<script src="atlas.js?v=2"></script>
-<script src="compare.js?v=1"></script>
-<script src="report.js?v=3"></script>
-<script src="livenews.js?v=2"></script>
-<script src="assistant.js?v=6"></script>
-<script src="pages.js?v=7"></script>
-<script src="https://cdn.jsdelivr.net/npm/lenis@1.1.13/dist/lenis.min.js"></script>
-<script src="landing.js?v=4"></script>
+<script src="app.js?v=30" defer></script>
+<script src="eo.js?v=10" defer></script>
+<script src="atlas.js?v=4" defer></script>
+<script src="compare.js?v=2" defer></script>
+<script src="report.js?v=5" defer></script>
+<script src="livenews.js?v=3" defer></script>
+<script src="assistant.js?v=7" defer></script>
+<script src="pages.js?v=9" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/lenis@1.1.13/dist/lenis.min.js" defer></script>
+<script src="landing.js?v=5" defer></script>
 </body>
 </html>

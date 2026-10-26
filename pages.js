@@ -134,7 +134,7 @@
       <div class="lv-site-now">${a ? `<i data-lucide="map-pin"></i> <b>${esc([p && p.name, p && p.country].filter(Boolean).join(', ') || 'Selected area')}</b> · ${a.aoi.areaHa.toLocaleString()} ha · analysed ${ago(a.generatedAt)}
         <button type="button" class="lv-link" data-lv="refresh" title="Fetch the newest satellite and weather data"><i data-lucide="refresh-cw"></i>Refresh now</button>
         <button type="button" class="lv-link" data-lv="open-si"><i data-lucide="map"></i>Map &amp; full analysis</button>
-        <button type="button" class="lv-btn report-pdf-btn lv-pdf" data-report-pdf><i data-lucide="file-down"></i>PDF report</button>` : '<i data-lucide="map-pin"></i> <b>No area selected yet.</b> Click a field on the dashboard map, or search a farm, town or coordinates.'}</div>
+        <button type="button" class="lv-btn report-pdf-btn lv-pdf" data-report-pdf><i data-lucide="file-down"></i>PDF report</button>` : tapText('<i data-lucide="map-pin"></i> <b>No area selected yet.</b> Click a field on the dashboard map, or search a farm, town or coordinates.')}</div>
       <form class="lv-search" data-lv="search">
         <input type="search" name="q" placeholder="Farm, town or coordinates (e.g. Goromonzi or -17.85, 31.35)" aria-label="Place to analyse">
         <select name="r" aria-label="Area size"><option value="500">500 m</option><option value="1000" selected>1 km</option><option value="2000">2 km</option><option value="5000">5 km</option><option value="10000">10 km</option><option value="25000">25 km</option></select>
@@ -432,7 +432,7 @@ const HAZARD_ICON = { Drought: 'sun', Flood: 'waves', 'Tropical cyclone': 'torna
     wire(host);
     const a = A();
     if (!a) {
-      host.innerHTML = `${siteBar(null)}<div class="lv-empty"><div class="lv-empty-icon"><i data-lucide="satellite"></i></div><h3>See live satellite results for any farm or region</h3><p>Zoom into the Dashboard map and click a field, or search a place above, or use your location. WAFEO reads the newest Sentinel-2 and Landsat imagery, soil maps, rainfall records, river flow, food-security and hazard alerts for that exact area, then explains what they mean and what to do.</p></div>`;
+      host.innerHTML = `${siteBar(null)}<div class="lv-empty"><div class="lv-empty-icon"><i data-lucide="satellite"></i></div><h3>See live satellite results for any farm or region</h3><p>${tapText('Zoom into the Dashboard map and click a field')}, or search a place above, or use your location. WAFEO reads the newest Sentinel-2 and Landsat imagery, soil maps, rainfall records, river flow, food-security and hazard alerts for that exact area, then explains what they mean and what to do.</p></div>`;
     } else {
       const fn = PAGES[pageId];
       host.innerHTML = siteBar(a) + (fn ? fn(a) : '');
@@ -492,9 +492,9 @@ const HAZARD_ICON = { Drought: 'sun', Flood: 'waves', 'Tropical cyclone': 'torna
       <div class="lv-grid2">
         <div class="lv-panel"><h3>What to do now</h3>${actions(a)}</div>
         <div class="lv-panel"><h3>Greenness over two years</h3><div class="lv-chart lv-chart-sm"><canvas id="lvDashNdvi"></canvas></div><p class="lv-note" id="lvDashNdviNote">Loading Sentinel-2 history…</p></div>
-      </div>` : `<div class="lv-empty"><div class="lv-empty-icon"><i data-lucide="mouse-pointer-click"></i></div><h3>Zoom into the map and click a field to analyse it</h3><p>Spin the globe or switch to the flat map, open any country from the Atlas, then zoom in until you can see fields. Clicking inside a field traces its outline from the latest satellite image, ready for a full analysis. You can also search a place above. Coloured dots are live hazard alerts (red is most severe).</p></div>`) + `
+      </div>` : tapText(`<div class="lv-empty"><div class="lv-empty-icon"><i data-lucide="mouse-pointer-click"></i></div><h3>Zoom into the map and click a field to analyse it</h3><p>Spin the globe or switch to the flat map, open any country from the Atlas, then zoom in until you can see fields. Clicking inside a field traces its outline from the latest satellite image, ready for a full analysis. You can also search a place above. Coloured dots are live hazard alerts (red is most severe).</p></div>`)) + `
       <div class="lv-panel"><h3>Live hazard alerts worldwide (GDACS)</h3>
-        <p class="lv-note">${red} red and ${orange} orange alerts in the last 45 days · checked ${hazardsAt ? ago(new Date(hazardsAt).toISOString()) : 'now'} · click a dot on the map for details.</p>
+        <p class="lv-note">${red} red and ${orange} orange alerts in the last 45 days · checked ${hazardsAt ? ago(new Date(hazardsAt).toISOString()) : 'now'} · ${tapText('click')} a dot on the map for details.</p>
         <ul class="lv-hazards">${liveHazards.filter(e => e.alert !== 'green').slice(0, 8).map(e => `<li><span class="lv-dot" style="background:${ALERT_COLOR[e.alert]}"></span>${hazardIcon[e.type]} <b>${esc(e.type)}</b> · ${esc(e.country)} · ${esc(String(e.from).slice(0, 10))}${e.url ? ` · <a href="${esc(e.url)}" target="_blank" rel="noopener">report</a>` : ''}</li>`).join('') || '<li>No orange or red alerts right now.</li>'}</ul>
       </div>`;
     if (a) ndviChart('lvDashNdvi', 'lvDashNdviNote');

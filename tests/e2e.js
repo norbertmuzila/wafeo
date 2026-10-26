@@ -40,13 +40,23 @@ async function req(method, path, body, { auth = true, timeout = 90000 } = {}) {
     expect(r.status === 200, 'status ' + r.status);
     expect(/<title>WAFEO<\/title>/.test(r.text), 'title is not "WAFEO"');
     expect(!/Created by Norbert|CREATED BY/i.test(r.text), 'creator line still present');
-    for (const f of ['app.js', 'eo.js', 'atlas.js', 'compare.js', 'report.js', 'livenews.js', 'pages.js', 'landing.js', 'style.css', 'landing.css', 'assets/wafeo-logo.svg']) expect(r.text.includes(f), f + ' not linked');
+    for (const f of ['app.js', 'eo.js', 'atlas.js', 'compare.js', 'report.js', 'livenews.js', 'pages.js', 'landing.js', 'icons.js', 'assistant.js', 'style.css', 'landing.css', 'assets/wafeo-logo.svg']) expect(r.text.includes(f), f + ' not linked');
   });
-  for (const [f, type] of [['/app.js', 'javascript'], ['/eo.js', 'javascript'], ['/atlas.js', 'javascript'], ['/compare.js', 'javascript'], ['/report.js', 'javascript'], ['/livenews.js', 'javascript'], ['/pages.js', 'javascript'], ['/landing.js', 'javascript'], ['/style.css', 'css'], ['/landing.css', 'css'], ['/assets/wafeo-logo.svg', 'svg'], ['/assets/wafeo-icon.svg', 'svg'], ['/assets/countries.json', 'json'], ['/privacy', 'html']]) {
+  for (const [f, type] of [['/app.js', 'javascript'], ['/eo.js', 'javascript'], ['/atlas.js', 'javascript'], ['/compare.js', 'javascript'], ['/report.js', 'javascript'], ['/livenews.js', 'javascript'], ['/pages.js', 'javascript'], ['/landing.js', 'javascript'], ['/icons.js', 'javascript'], ['/assistant.js', 'javascript'], ['/style.css', 'css'], ['/landing.css', 'css'], ['/assets/wafeo-logo.svg', 'svg'], ['/assets/wafeo-icon.svg', 'svg'], ['/assets/countries.json', 'json'], ['/privacy', 'html']]) {
     await check(`asset ${f}`, async () => {
       const r = await req('GET', f, null, { auth: false, timeout: 30000 });
       expect(r.status === 200 && r.type.includes(type), `${r.status} ${r.type}`);
-      if (f === '/assets/countries.json') expect(r.json.length === 208, 'expected 208 countries, got ' + r.json.length);
+      if (f === '/assets/countries.json') {
+        expect(r.json.length === 208, 'expected 208 countries, got ' + r.json.length);
+        // Main languages come from Unicode CLDR: national languages first, no foreign or minority mix-ups.
+        const langs = cc => (r.json.find(c => c.cc === cc) || {}).languages || [];
+        expect(langs('zw').join() === 'Shona,English,Ndebele', 'Zimbabwe: ' + langs('zw').join(', '));
+        expect(!langs('zw').some(l => /Chibarwe|Chewa/i.test(l)), 'Zimbabwe lists a minority language as main');
+        expect(langs('ke').includes('Swahili') && langs('ke').includes('English'), 'Kenya: ' + langs('ke').join(', '));
+        expect(langs('za').includes('isiZulu') && langs('za').length <= 4, 'South Africa: ' + langs('za').join(', '));
+        expect(r.json.filter(c => c.cc !== 'aq').every(c => c.languages.length >= 1 && c.languages.length <= 4), 'a country has no or too many languages');
+        return 'Zimbabwe: ' + langs('zw').join(', ');
+      }
     });
   }
 

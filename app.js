@@ -6,6 +6,48 @@
 const API = /vercel\.app$|^localhost$|^127\.0\.0\.1$/.test(window.location.hostname)
   ? '/api'
   : 'https://wafeo-webapplication.vercel.app/api';
+// Older phones (iOS before 16, older Android browsers) lack AbortSignal.timeout,
+// which every request here uses: without it the requests fail outright.
+if (typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout !== 'function') {
+  AbortSignal.timeout = ms => {
+    const c = new AbortController();
+    setTimeout(() => { try { c.abort(new DOMException('The operation timed out.', 'TimeoutError')); } catch (e) { c.abort(); } }, ms);
+    return c.signal;
+  };
+}
+
+// Load a script or stylesheet once, on demand (heavy libraries are not
+// downloaded until a feature needs them, which keeps phones fast).
+const _loaded = new Map();
+function loadAsset(url) {
+  if (!_loaded.has(url)) {
+    _loaded.set(url, new Promise((resolve, reject) => {
+      const css = /\.css(\?|$)/.test(url);
+      const el = document.createElement(css ? 'link' : 'script');
+      if (css) { el.rel = 'stylesheet'; el.href = url; } else { el.src = url; el.async = false; }
+      el.onload = () => resolve();
+      el.onerror = () => { _loaded.delete(url); reject(new Error('Could not load ' + url.split('/')[2])); };
+      document.head.appendChild(el);
+    }));
+  }
+  return _loaded.get(url);
+}
+window.loadAsset = loadAsset;
+
+// Touch screens are tapped, not clicked: instructions say "tap" on phones.
+const isTouch = () => typeof matchMedia === 'function' && matchMedia('(hover: none) and (pointer: coarse)').matches;
+function tapText(s) {
+  if (!isTouch()) return s;
+  // Whole words only, so icon names such as "mouse-pointer-click" are left alone.
+  return String(s).replace(/(^|[^\w-])([Cc])lick(ing|ed|s)?(?![\w-])/g,
+    (m, pre, c, end) => pre + (c === 'C' ? 'Tap' : 'tap') + ({ ing: 'ping', ed: 'ped', s: 's' }[end] || ''));
+}
+window.tapText = tapText;
+document.addEventListener('DOMContentLoaded', () => {
+  const el = document.getElementById('reportHeroText');
+  if (el) el.textContent = tapText(el.textContent);
+});
+
 const GOOGLE_CLIENT_ID = '681642080635-fpqmjobr8hnt63adria7qmlk3kar8kej.apps.googleusercontent.com';
 const SESSION_KEY = 'wafeo.session';
 const ROLE_LABELS = {
@@ -545,7 +587,8 @@ function toggleTheme() {
 (function lucideIcons() {
   let queued = false;
   const draw = () => { queued = false; if (window.lucide) window.lucide.createIcons({ attrs: { 'stroke-width': 1.9, 'aria-hidden': 'true' } }); };
-  const queue = () => { if (!queued) { queued = true; requestAnimationFrame(draw); } };
+  // The timer is a fallback: animation frames pause while a tab is in the background.
+  const queue = () => { if (!queued) { queued = true; requestAnimationFrame(() => queued && draw()); setTimeout(() => queued && draw(), 120); } };
   draw();
   new MutationObserver(muts => { if (muts.some(m => [...m.addedNodes].some(n => n.nodeType === 1 && (n.matches('i[data-lucide]') || n.querySelector('i[data-lucide]'))))) queue(); })
     .observe(document.body, { childList: true, subtree: true });

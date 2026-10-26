@@ -393,7 +393,14 @@
   }
 
   // ─── Report ───────────────────────────────────────────────
+  const PDF_LIBS = ['https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js', 'https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js'];
+  async function pdfTools() {
+    for (const u of PDF_LIBS) await window.loadAsset(u);           // autotable needs jsPDF first
+    if (!window.jspdf || !window.jspdf.jsPDF || !window.jspdf.jsPDF.API.autoTable) throw new Error('PDF tools did not load');
+  }
+
   async function build(a) {
+    await pdfTools();
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF({ unit: 'mm', format: 'a4', compress: true });
     const title = fileTitle(a);
@@ -673,12 +680,8 @@
   async function download(btn) {
     const a = window.wafeoSite && window.wafeoSite.last();
     if (!a) {
-      const msg = 'Analyse a field first: zoom into the dashboard map and click a field, or use Site Intelligence.';
+      const msg = tapText('Analyse a field first: zoom into the dashboard map and click a field, or use Site Intelligence.');
       if (btn) { const old = btn.innerHTML; btn.textContent = msg; setTimeout(() => { btn.innerHTML = old; }, 4000); }
-      return;
-    }
-    if (!window.jspdf || !window.jspdf.jsPDF || !window.jspdf.jsPDF.API.autoTable) {
-      if (btn) btn.textContent = 'PDF tools are still loading. Try again in a moment.';
       return;
     }
     const html = btn ? btn.innerHTML : '';

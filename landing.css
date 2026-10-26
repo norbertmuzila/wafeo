@@ -320,3 +320,21 @@
   .lp-nav-ctas { gap: 6px; }
   .lp-nav .lp-btn { padding: 8px 12px; font-size: 12.5px; }
 }
+
+/* Small phones: keep the nav buttons on one line */
+@media (max-width: 420px) {
+  .lp-nav { gap: 8px; padding-left: 12px; padding-right: 12px; }
+  .lp-brand img { height: 34px; padding: 5px 8px; }
+  .lp-nav .lp-btn { padding: 7px 10px; font-size: 12px; white-space: nowrap; gap: 6px; }
+  .lp-nav .lp-btn svg, .lp-nav .lp-btn svg.lucide { width: 13px; height: 13px; }
+  .lp-nav-ctas { gap: 5px; }
+}
+
+/* Phones: every instrument visible at once (no hidden sideways scroll), scroll cue on one line. */
+@media (max-width: 720px) {
+  .lp-tabs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); overflow: visible; gap: 6px; }
+  .lp-tab { padding: 10px 12px; min-width: 0; }
+  .lp-tab b { font-size: 13px; overflow-wrap: anywhere; }
+  .lp-tab small { font-size: 10px; letter-spacing: 0.08em; overflow-wrap: anywhere; }
+  .lp-descend { letter-spacing: 0.18em; white-space: nowrap; }
+}

@@ -66,10 +66,24 @@
   const empty = () => ({ type: 'FeatureCollection', features: [] });
 
   // ─── Setup ─────────────────────────────────────────────────
+  // MapLibre (~250 KB) loads only when the map is first needed, and is fetched
+  // quietly in the background once the landing page has finished loading.
+  const LIBS = ['https://unpkg.com/maplibre-gl@5.6.0/dist/maplibre-gl.css', 'https://unpkg.com/maplibre-gl@5.6.0/dist/maplibre-gl.js', 'https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js'];
+  let libs = null;
+  const loadLibs = () => (libs = libs || Promise.all(LIBS.map(u => window.loadAsset(u))).catch(err => { libs = null; throw err; }));
+  addEventListener('load', () => setTimeout(() => { loadLibs().catch(() => {}); }, 3000));
+
   function init() {
     if (map) return map;
     const root = document.getElementById('atlas');
-    if (!root || typeof maplibregl === 'undefined') return null;
+    if (!root) return null;
+    if (typeof maplibregl === 'undefined') {
+      loadLibs().then(() => { init(); resize(); }).catch(() => {
+        const el = document.getElementById('atlasMap');
+        if (el && !map) el.innerHTML = '<div class="atlas-fail">The map could not load. Check your internet connection and reload the page.</div>';
+      });
+      return null;
+    }
     ['atlasMap', 'atlasPanel', 'atlasList', 'atlasSearch', 'atlasCount', 'atlasCard', 'atlasHint', 'atlasRegions'].forEach(id => { els[id] = document.getElementById(id); });
 
     map = new maplibregl.Map({
@@ -79,7 +93,12 @@
     map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'bottom-right');
     map.addControl(new maplibregl.ScaleControl({ maxWidth: 110 }), 'bottom-left');
     map.on('styleimagemissing', loadFlag);
-    map.on('load', () => { loadCountries(); spin(); });
+    map.on('load', () => {
+      loadCountries(); spin();
+      // Data that arrived before the map existed.
+      if (hazards.length) setHazards(hazards);
+      if (aoi) setAoi(aoi, true);
+    });
     // Spin again only once every other camera movement has finished.
     map.on('moveend', () => setTimeout(spin, 60));
     map.on('zoomend', updateHint);
@@ -135,7 +154,9 @@
       }, 'hazards');
     } catch (e) { console.warn('Atlas list failed to load:', e); }
     try {
-      const topo = await fetch('https://cdn.jsdelivr.net/npm/world-atlas@2.0.2/countries-50m.json').then(r => r.json());
+      // Phones get the lighter 1:110m borders (about 100 KB instead of 750 KB).
+      const borders = innerWidth < 760 ? 'countries-110m' : 'countries-50m';
+      const topo = await fetch(`https://cdn.jsdelivr.net/npm/world-atlas@2.0.2/${borders}.json`).then(r => r.json());
       const fc = topojson.feature(topo, topo.objects.countries);
       const byNum = new Map(countries.filter(c => c.num).map(c => [String(c.num).padStart(3, '0'), c]));
       const byName = new Map(countries.map(c => [c.name.toLowerCase(), c]));
@@ -254,7 +275,7 @@
         <div><dt>Region</dt><dd>${esc(c.subregion || c.region)}</dd></div>
         <div><dt>Capital</dt><dd>${esc(c.capital || '—')}</dd></div>
         <div><dt>Area</dt><dd>${Math.round(c.areaKm2 || 0).toLocaleString()} km²${c.landlocked ? ' · landlocked' : ''}</dd></div>
-        <div><dt>Languages</dt><dd>${esc(c.languages.join(', ') || '—')}</dd></div>
+        <div><dt>Main languages</dt><dd>${esc(c.languages.join(', ') || '—')}</dd></div>
       </dl>
       <h4>Farming, water and food</h4>
       <dl class="atlas-facts" id="atlasWb"><div class="atlas-loading">Loading latest national statistics…</div></dl>
@@ -409,10 +430,10 @@
   function updateHint() {
     if (!els.atlasHint || !map) return;
     const z = map.getZoom();
-    els.atlasHint.innerHTML = z >= FIELD_ZOOM
+    els.atlasHint.innerHTML = window.tapText(z >= FIELD_ZOOM
       ? '<i data-lucide="mouse-pointer-click"></i>Click inside a field to select it for analysis'
       : z >= 6 ? '<i data-lucide="zoom-in"></i>Zoom in further to pick a field, or click for options'
-      : '<i data-lucide="globe-2"></i>Click a country for its profile · zoom in to choose a farm';
+      : '<i data-lucide="globe-2"></i>Click a country for its profile · zoom in to choose a farm');
   }
 
   let flashTimer = null;

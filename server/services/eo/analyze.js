@@ -42,36 +42,38 @@ async function analyzeSite(body) {
   const c = geo.centroid(aoi);
   const [placeR, s2Now, s2Prev, s2LastYear, lst, dem, cover, gsw, soilR, wrbR, wx, rain, river, ecoR, smapR, graceR, isdaR] = await Promise.all([
     settle('Place', 10000, () => where.place(c)),
-    settle('Sentinel-2', 45000, () => s2.analyzeLatest(aoi, now)),
-    settle('Sentinel-2 (1 month ago)', 40000, () => s2.ndviInWindow(aoi, 50, 20, now)),
-    settle('Sentinel-2 (last year)', 40000, () => s2.ndviInWindow(aoi, 385, 345, now)),
-    settle('Landsat 8/9', 40000, () => pc.landsatLst(aoi, now)),
-    settle('Copernicus DEM', 30000, () => pc.terrain(aoi)),
-    settle('ESA WorldCover', 30000, () => pc.landCover(aoi)),
-    settle('JRC Surface Water', 30000, () => pc.surfaceWaterHistory(aoi)),
-    settle('SoilGrids', 35000, () => soil.soilProfile(aoi)),
-    settle('SoilGrids soil type', 30000, () => soil.wrbClass(aoi)),
+    settle('Sentinel-2', 32000, () => s2.analyzeLatest(aoi, now)),
+    settle('Sentinel-2 (1 month ago)', 28000, () => s2.ndviInWindow(aoi, 50, 20, now)),
+    settle('Sentinel-2 (last year)', 28000, () => s2.ndviInWindow(aoi, 385, 345, now)),
+    settle('Landsat 8/9', 28000, () => pc.landsatLst(aoi, now)),
+    settle('Copernicus DEM', 28000, () => pc.terrain(aoi)),
+    settle('ESA WorldCover', 28000, () => pc.landCover(aoi)),
+    settle('JRC Surface Water', 28000, () => pc.surfaceWaterHistory(aoi)),
+    settle('SoilGrids', 28000, () => soil.soilProfile(aoi)),
+    settle('SoilGrids soil type', 28000, () => soil.wrbClass(aoi)),
     settle('Open-Meteo weather', 20000, () => climate.weather(c, now)),
-    settle('ERA5 rainfall baseline', 30000, () => climate.rainfallAnomaly(c, null, now)),
+    settle('ERA5 rainfall baseline', 28000, () => climate.rainfallAnomaly(c, null, now)),
     settle('GloFAS river flow', 20000, () => climate.riverFlow(c)),
-    settle('ECOSTRESS', 40000, () => nasa.ecostress(aoi, now)),
-    settle('SMAP', 35000, () => nasa.smap(aoi, now)),
-    settle('GRACE-FO', 40000, () => nasa.grace(aoi)),
-    settle('iSDAsoil', 30000, () => isda.isdaSoil(aoi))
+    settle('ECOSTRESS', 28000, () => nasa.ecostress(aoi, now)),
+    settle('SMAP', 28000, () => nasa.smap(aoi, now)),
+    settle('GRACE-FO', 28000, () => nasa.grace(aoi)),
+    settle('iSDAsoil', 28000, () => isda.isdaSoil(aoi))
   ]);
   // SWOT downloads an ~8 MB pass file, so only look when the area holds water.
   const hasWater = (gsw.value?.maxExtentHa || 0) >= 1 || (s2Now.value?.water?.areaHa || 0) >= 1;
-  const swotR = !nasa.configured()
-    ? { ok: false, value: { available: false, reason: 'Not connected: set EARTHDATA_TOKEN (free NASA Earthdata account).' } }
-    : hasWater ? await settle('SWOT', 40000, () => swotLakes(aoi, now)) : { ok: false, value: { available: false, reason: 'No lake or reservoir in this area.' } };
   const pl = placeR.value || {};
   // Open sea: no country, no land-cover tile and no Sentinel-2 land scene.
   if (!pl.country && !cover.value?.available && !s2Now.value?.available) {
     throw geo.httpError(400, 'This spot is open sea, with no farmland or land data. Choose an area on land.');
   }
-  const [fsR, hzR] = await Promise.all([
-    settle('FEWS NET food security', 35000, () => live.foodSecurity(pl, now)),
-    settle('GDACS hazards', 20000, () => live.hazardsNear(c, pl.country, now))
+  // Stage 2 runs together and is capped at 20 s, so the whole analysis stays
+  // inside the 60 s limit of the hosting platform even when sources are slow.
+  const [fsR, hzR, swotR] = await Promise.all([
+    settle('FEWS NET food security', 20000, () => live.foodSecurity(pl, now)),
+    settle('GDACS hazards', 20000, () => live.hazardsNear(c, pl.country, now)),
+    !nasa.configured()
+      ? { ok: false, value: { available: false, reason: 'Not connected: set EARTHDATA_TOKEN (free NASA Earthdata account).' } }
+      : hasWater ? settle('SWOT', 20000, () => swotLakes(aoi, now)) : { ok: false, value: { available: false, reason: 'No lake or reservoir in this area.' } }
   ]);
 
   const data = {

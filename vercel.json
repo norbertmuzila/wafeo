@@ -58,6 +58,10 @@
       "use": "@vercel/static"
     },
     {
+      "src": "icons.js",
+      "use": "@vercel/static"
+    },
+    {
       "src": "landing.js",
       "use": "@vercel/static"
     },

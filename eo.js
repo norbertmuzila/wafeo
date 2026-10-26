@@ -77,7 +77,7 @@
     const bar = document.createElement('div');
     bar.id = 'eoToolbar';
     bar.className = 'eo-toolbar';
-    bar.innerHTML = `
+    bar.innerHTML = tapText(`
       <div class="eo-seg" role="group" aria-label="How to choose the area">
         <button type="button" class="eo-seg-btn active" data-mode="field"><i data-lucide="mouse-pointer-click"></i>Click a field</button>
         <button type="button" class="eo-seg-btn" data-mode="point"><i data-lucide="locate-fixed"></i>Point + radius</button>
@@ -95,7 +95,7 @@
         <button type="button" class="eo-btn-ghost" id="eoClear">Clear</button>
       </div>
       <button type="button" class="eo-btn" id="eoRun"><i data-lucide="satellite"></i>Analyse with satellites</button>
-      <span class="eo-hint" id="eoHint">Zoom in on the map until you can see fields, then click inside one to select it.</span>`;
+      <span class="eo-hint" id="eoHint">Zoom in on the map until you can see fields, then click inside one to select it.</span>`);
     header.insertBefore(bar, header.querySelector('.si-tabs'));
 
     bar.querySelectorAll('.eo-seg-btn').forEach(b => b.addEventListener('click', () => setMode(b.dataset.mode)));
@@ -153,7 +153,7 @@
 
   function hint(text, isError) {
     const h = document.getElementById('eoHint');
-    if (h) { h.textContent = text; h.classList.toggle('eo-hint-error', !!isError); }
+    if (h) { h.textContent = tapText(text); h.classList.toggle('eo-hint-error', !!isError); }
   }
 
   // ─── Map drawing ──────────────────────────────────────────
