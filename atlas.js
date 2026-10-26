@@ -300,7 +300,11 @@
     const best = new Map();
     for (const x of countryBoxes) {
       if (x.box[0] > e || x.box[2] < w || x.box[1] > n || x.box[3] < s) continue;
-      const d = contains(x.g, [c.lng, c.lat]) ? -1 : Math.hypot(Math.max(x.box[0] - c.lng, 0, c.lng - x.box[2]), Math.max(x.box[1] - c.lat, 0, c.lat - x.box[3]));
+      const inside = contains(x.g, [c.lng, c.lat]);
+      // Countries crossing the date line (Russia, Fiji, New Zealand) have boxes
+      // spanning the globe: count them only when the centre is inside them.
+      if (x.box[2] - x.box[0] > 180 && !inside) continue;
+      const d = inside ? -1 : Math.hypot(Math.max(x.box[0] - c.lng, 0, c.lng - x.box[2]), Math.max(x.box[1] - c.lat, 0, c.lat - x.box[3]));
       const prev = best.get(x.cc);
       if (!prev || d < prev.d) best.set(x.cc, { cc: x.cc, d, box: x.box });
     }
